@@ -136,8 +136,8 @@ function DATABASE:New()
   self:_RegisterGroupsAndUnits()
   self:_RegisterClients()
   self:_RegisterStatics()
-  self:_RegisterAirbases()
   --self:_RegisterPlayers()
+  --self:_RegisterAirbases()
 
   self.UNITS_Position = 0
 
@@ -162,12 +162,12 @@ end
 function DATABASE:AddUnit( DCSUnitName )
 
   if not self.UNITS[DCSUnitName] then
-  
+
     -- Debug info.
     self:T( { "Add UNIT:", DCSUnitName } )
-    
+
     --local UnitRegister = UNIT:Register( DCSUnitName )
-    
+
     -- Register unit
     self.UNITS[DCSUnitName]=UNIT:Register(DCSUnitName)
 
@@ -776,7 +776,7 @@ function DATABASE:GetStaticUnitTemplate( StaticName )
     return UnitTemplate, self.Templates.Statics[StaticName].CoalitionID, self.Templates.Statics[StaticName].CategoryID, self.Templates.Statics[StaticName].CountryID
   else
     self:E("ERROR: Static unit template does NOT exist for static "..tostring(StaticName))
-    return nil  
+    return nil
   end
 end
 
@@ -802,7 +802,7 @@ function DATABASE:GetGroupTemplateFromUnitName( UnitName )
     return self.Templates.Units[UnitName].GroupTemplate
   else
     self:E("ERROR: Unit template does not exist for unit "..tostring(UnitName))
-    return nil    
+    return nil
   end
 end
 
@@ -880,13 +880,13 @@ end
 function DATABASE:_RegisterGroupsAndUnits()
 
   local CoalitionsData = { GroupsRed = coalition.getGroups( coalition.side.RED ), GroupsBlue = coalition.getGroups( coalition.side.BLUE ),  GroupsNeutral = coalition.getGroups( coalition.side.NEUTRAL ) }
-  
+
   for CoalitionId, CoalitionData in pairs( CoalitionsData ) do
-  
+
     for DCSGroupId, DCSGroup in pairs( CoalitionData ) do
 
       if DCSGroup:isExist() then
-      
+
         -- Group name.
         local DCSGroupName = DCSGroup:getName()
 
@@ -899,11 +899,11 @@ function DATABASE:_RegisterGroupsAndUnits()
 
           -- Get unit name.
           local DCSUnitName = DCSUnit:getName()
-          
+
           -- Add unit.
           self:I(string.format("Register Unit: %s", tostring(DCSUnitName)))
           self:AddUnit( DCSUnitName )
-          
+
         end
       else
         self:E({"Group does not exist: ", DCSGroup})
@@ -956,7 +956,7 @@ end
 function DATABASE:_RegisterAirbases()
 
  for DCSAirbaseId, DCSAirbase in pairs(world.getAirbases()) do
- 
+
     -- Get the airbase name.
     local DCSAirbaseName = DCSAirbase:getName()
 
@@ -965,9 +965,9 @@ function DATABASE:_RegisterAirbases()
 
     -- Add and register airbase.
     local airbase=self:AddAirbase( DCSAirbaseName )
-    
+
     -- Unique ID.
-    local airbaseUID=airbase:GetID(true)    
+    local airbaseUID=airbase:GetID(true)
 
     -- Debug output.
     local text=string.format("Register %s: %s (ID=%d UID=%d), parking=%d [", AIRBASE.CategoryName[airbase.category], tostring(DCSAirbaseName), airbaseID, airbaseUID, airbase.NparkingTotal)
@@ -976,14 +976,14 @@ function DATABASE:_RegisterAirbases()
         text=text..string.format("%d=%d ", terminalType, airbase.NparkingTerminal[terminalType])
       end
     end
-    text=text.."]"        
+    text=text.."]"
     self:I(text)
-    
+
     -- Check for DCS bug IDs.
     if airbaseID~=airbase:GetID() then
       --self:E("WARNING: :getID does NOT match :GetID!")
-    end    
-    
+    end
+
   end
 
   return self
@@ -999,74 +999,74 @@ function DATABASE:_EventOnBirth( Event )
   self:F( { Event } )
 
   if Event.IniDCSUnit then
-  
+
     if Event.IniObjectCategory == 3 then
-    
+
       self:AddStatic( Event.IniDCSUnitName )
-      
+
     else
-    
+
       if Event.IniObjectCategory == 1 then
-      
+
         self:AddUnit( Event.IniDCSUnitName )
         self:AddGroup( Event.IniDCSGroupName )
-        
+
         -- Add airbase if it was spawned later in the mission.
         local DCSAirbase = Airbase.getByName(Event.IniDCSUnitName)
         if DCSAirbase then
           self:I(string.format("Adding airbase %s", tostring(Event.IniDCSUnitName)))
           self:AddAirbase(Event.IniDCSUnitName)
         end
-        
+
       end
     end
-    
+
     if Event.IniObjectCategory == 1 then
-    
+
       Event.IniUnit = self:FindUnit( Event.IniDCSUnitName )
       Event.IniGroup = self:FindGroup( Event.IniDCSGroupName )
-      
+
       -- Client
       local client=self.CLIENTS[Event.IniDCSUnitName] --Wrapper.Client#CLIENT
-      
+
       if client then
         -- TODO: create event ClientAlive
-      end      
-    
-      -- Get player name.  
+      end
+
+      -- Get player name.
       local PlayerName = Event.IniUnit:GetPlayerName()
-      
+
       if PlayerName then
-      
+
         -- Debug info.
         self:I(string.format("Player '%s' joint unit '%s' of group '%s'", tostring(PlayerName), tostring(Event.IniDCSUnitName), tostring(Event.IniDCSGroupName)))
-        
+
         -- Add client in case it does not exist already.
         if not client then
           client=self:AddClient(Event.IniDCSUnitName)
         end
-        
+
         -- Add player.
         client:AddPlayer(PlayerName)
-        
+
         -- Add player.
         if not self.PLAYERS[PlayerName] then
           self:AddPlayer( Event.IniUnitName, PlayerName )
         end
-        
+
         -- Player settings.
         local Settings = SETTINGS:Set( PlayerName )
         Settings:SetPlayerMenu(Event.IniUnit)
-        
+
         -- Create an event.
         self:CreateEventPlayerEnterAircraft(Event.IniUnit)
-        
+
       end
-      
+
     end
-    
+
   end
-  
+
 end
 
 
@@ -1076,48 +1076,48 @@ end
 function DATABASE:_EventOnDeadOrCrash( Event )
 
   if Event.IniDCSUnit then
-  
+
     local name=Event.IniDCSUnitName
-  
+
     if Event.IniObjectCategory == 3 then
-      
+
       ---
       -- STATICS
       ---
-    
+
       if self.STATICS[Event.IniDCSUnitName] then
         self:DeleteStatic( Event.IniDCSUnitName )
       end
-      
+
     else
-    
+
       if Event.IniObjectCategory == 1 then
-      
+
         ---
         -- UNITS
         ---
-      
+
         -- Delete unit.
         if self.UNITS[Event.IniDCSUnitName] then
           self:DeleteUnit(Event.IniDCSUnitName)
         end
-        
+
         -- Remove client players.
         local client=self.CLIENTS[name] --Wrapper.Client#CLIENT
-        
+
         if client then
           client:RemovePlayers()
         end
-                
+
       end
     end
-    
+
     -- Add airbase if it was spawned later in the mission.
     local airbase=self.AIRBASES[Event.IniDCSUnitName] --Wrapper.Airbase#AIRBASE
     if airbase and (airbase:IsHelipad() or airbase:IsShip()) then
       self:DeleteAirbase(Event.IniDCSUnitName)
     end
-    
+
   end
 
   -- Account destroys.
@@ -1133,28 +1133,28 @@ function DATABASE:_EventOnPlayerEnterUnit( Event )
 
   if Event.IniDCSUnit then
     if Event.IniObjectCategory == 1 then
-    
+
       -- Add unit.
       self:AddUnit( Event.IniDCSUnitName )
-      
+
       -- Ini unit.
       Event.IniUnit = self:FindUnit( Event.IniDCSUnitName )
-      
+
       -- Add group.
       self:AddGroup( Event.IniDCSGroupName )
-      
+
       -- Get player unit.
       local PlayerName = Event.IniDCSUnit:getPlayerName()
-      
+
       if PlayerName then
-      
+
         if not self.PLAYERS[PlayerName] then
           self:AddPlayer( Event.IniDCSUnitName, PlayerName )
         end
-        
+
         local Settings = SETTINGS:Set( PlayerName )
         Settings:SetPlayerMenu( Event.IniUnit )
-        
+
       else
         self:E("ERROR: getPlayerName() returned nil for event PlayerEnterUnit")
       end
@@ -1170,30 +1170,30 @@ function DATABASE:_EventOnPlayerLeaveUnit( Event )
   self:F2( { Event } )
 
   if Event.IniUnit then
-  
+
     if Event.IniObjectCategory == 1 then
-    
+
       -- Try to get the player name. This can be buggy for multicrew aircraft!
       local PlayerName = Event.IniUnit:GetPlayerName()
-      
+
       if PlayerName then --and self.PLAYERS[PlayerName] then
-      
+
         -- Debug info.
         self:I(string.format("Player '%s' left unit %s", tostring(PlayerName), tostring(Event.IniUnitName)))
-        
+
         -- Remove player menu.
         local Settings = SETTINGS:Set( PlayerName )
         Settings:RemovePlayerMenu(Event.IniUnit)
-        
+
         -- Delete player.
         self:DeletePlayer(Event.IniUnit, PlayerName)
-        
+
         -- Client stuff.
         local client=self.CLIENTS[Event.IniDCSUnitName] --Wrapper.Client#CLIENT
         if client then
           client:RemovePlayer(PlayerName)
         end
-        
+
       end
     end
   end
@@ -1424,7 +1424,7 @@ end
 -- @param #DATABASE self
 -- @param Ops.FlightGroup#FLIGHTGROUP flightgroup
 function DATABASE:AddFlightGroup(flightgroup)
-  self:I({NewFlightGroup=flightgroup.groupname})
+  self:T({NewFlightGroup=flightgroup.groupname})
   self.FLIGHTGROUPS[flightgroup.groupname]=flightgroup
 end
 
@@ -1526,13 +1526,13 @@ function DATABASE:_RegisterTemplates()
                   for group_num, Template in pairs(obj_type_data.group) do
 
                     if obj_type_name ~= "static" and Template and Template.units and type(Template.units) == 'table' then  --making sure again- this is a valid group
-                    
+
                       self:_RegisterGroupTemplate(Template, CoalitionSide, _DATABASECategory[string.lower(CategoryName)], CountryID)
-                      
+
                     else
-                    
+
                       self:_RegisterStaticTemplate(Template, CoalitionSide, _DATABASECategory[string.lower(CategoryName)], CountryID)
-                      
+
                     end --if GroupTemplate and GroupTemplate.units then
                   end --for group_num, GroupTemplate in pairs(obj_type_data.group) do
                 end --if ((type(obj_type_data) == 'table') and obj_type_data.group and (type(obj_type_data.group) == 'table') and (#obj_type_data.group > 0)) then

@@ -337,16 +337,32 @@ UTILS.MetersToNM = function(meters)
   return meters/1852
 end
 
+UTILS.KiloMetersToNM = function(kilometers)
+  return kilometers/1852*1000
+end
+
 UTILS.MetersToSM = function(meters)
   return meters/1609.34
+end
+
+UTILS.KiloMetersToSM = function(kilometers)
+  return kilometers/1609.34*1000
 end
 
 UTILS.MetersToFeet = function(meters)
   return meters/0.3048
 end
 
+UTILS.KiloMetersToFeet = function(kilometers)
+  return kilometers/0.3048*1000
+end
+
 UTILS.NMToMeters = function(NM)
   return NM*1852
+end
+
+UTILS.NMToKiloMeters = function(NM)
+  return NM*1852/1000
 end
 
 UTILS.FeetToMeters = function(feet)
@@ -922,6 +938,33 @@ function UTILS.VecNorm(a)
   return math.sqrt(UTILS.VecDot(a, a))
 end
 
+--- Calculate the distance between two 2D vectors.
+-- @param DCS#Vec2 a Vector in 3D with x, y components.
+-- @param DCS#Vec2 b Vector in 3D with x, y components.
+-- @return #number Distance between the vectors.
+function UTILS.VecDist2D(a, b)
+
+  local c={x=b.x-a.x, y=b.y-a.y}
+  
+  local d=math.sqrt(c.x*c.x+c.y*c.y)
+
+  return d
+end
+
+
+--- Calculate the distance between two 3D vectors.
+-- @param DCS#Vec3 a Vector in 3D with x, y, z components.
+-- @param DCS#Vec3 b Vector in 3D with x, y, z components.
+-- @return #number Distance between the vectors.
+function UTILS.VecDist3D(a, b)
+
+  local c={x=b.x-a.x, y=b.y-a.y, z=b.z-a.z}
+  
+  local d=math.sqrt(UTILS.VecDot(c, c))
+
+  return d
+end
+
 --- Calculate the [cross product](https://en.wikipedia.org/wiki/Cross_product) of two 3D vectors. The result is a 3D vector.
 -- @param DCS#Vec3 a Vector in 3D with x, y, z components.
 -- @param DCS#Vec3 b Vector in 3D with x, y, z components.
@@ -1457,4 +1500,24 @@ function UTILS.GetOSTime()
   end
 
   return nil
+end
+
+--- Shuffle a table accoring to Fisher Yeates algorithm
+--@param #table table to be shuffled
+--@return #table
+function UTILS.ShuffleTable(t)
+  if t == nil or type(t) ~= "table" then 
+    BASE:I("Error in ShuffleTable: Missing or wrong tyåe of Argument") 
+    return 
+  end
+  math.random()
+  math.random()
+  math.random()
+  local TempTable = {}
+  for i = 1, #t do
+    local r = math.random(1,#t)
+    TempTable[i] = t[r]
+    table.remove(t,r)
+  end
+  return TempTable
 end
