@@ -29,6 +29,7 @@
 -- @field #table awacsZones AWACS zones. Each element is of type `#AIRWING.PatrolZone`.
 -- @field #table tankerZones Tanker zones. Each element is of type `#AIRWING.TankerZone`.
 -- @field Ops.Chief#CHIEF chief Chief of staff.
+-- @field #table limitMission Table of limits for mission types.
 -- @extends Core.Fsm#FSM
 
 --- *He who has never leared to obey cannot be a good commander* -- Aristotle
@@ -128,11 +129,12 @@ COMMANDER = {
   gcicapZones     =    {},
   awacsZones      =    {},
   tankerZones     =    {},
+  limitMission    =    {},
 }
 
 --- COMMANDER class version.
 -- @field #string version
-COMMANDER.version="0.1.0"
+COMMANDER.version="0.1.1"
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- TODO list
@@ -358,6 +360,22 @@ function COMMANDER:SetVerbosity(VerbosityLevel)
   self.verbose=VerbosityLevel or 0
   return self
 end
+
+--- Set limit for number of total or specific missions to be executed simultaniously.
+-- @param #COMMANDER self
+-- @param #number Limit Number of max. mission of this type. Default 10.
+-- @param #string MissionType Type of mission, e.g. `AUFTRAG.Type.BAI`. Default `"Total"` for total number of missions.
+-- @return #COMMANDER self
+function COMMANDER:SetLimitMission(Limit, MissionType)
+  MissionType=MissionType or "Total"
+  if MissionType then
+    self.limitMission[MissionType]=Limit or 10
+  else
+    self:E(self.lid.."ERROR: No mission type given for setting limit!")
+  end
+  return self
+end
+
 
 --- Get coalition.
 -- @param #COMMANDER self
@@ -1046,6 +1064,11 @@ function COMMANDER:CheckMissionQueue()
   if Nmissions==0 then
     return nil
   end
+  
+  local NoLimit=self:_CheckMissionLimit("Total")  
+  if NoLimit==false then
+    return nil
+  end
 
   -- Sort results table wrt prio and start time.
   local function _sort(a, b)
@@ -1070,7 +1093,7 @@ function COMMANDER:CheckMissionQueue()
     local mission=_mission --Ops.Auftrag#AUFTRAG
     
     -- We look for PLANNED missions.
-    if mission:IsPlanned() and mission:IsReadyToGo() and (mission.importance==nil or mission.importance<=vip) then
+    if mission:IsPlanned() and mission:IsReadyToGo() and (mission.importance==nil or mission.importance<=vip) and self:_CheckMissionLimit(mission.type) then
     
       ---
       -- PLANNNED Mission
@@ -1190,7 +1213,7 @@ function COMMANDER:RecruitAssetsForMission(Mission)
   local Payloads=Mission.payloads
   
   -- Recruite assets.
-  local recruited, assets, legions=LEGION.RecruitCohortAssets(Cohorts, Mission.type, Mission.alert5MissionType, NreqMin, NreqMax, TargetVec2, Payloads, Mission.engageRange, Mission.refuelSystem, nil)
+  local recruited, assets, legions=LEGION.RecruitCohortAssets(Cohorts, Mission.type, Mission.alert5MissionType, NreqMin, NreqMax, TargetVec2, Payloads, Mission.engageRange, Mission.refuelSystem)
 
   return recruited, assets, legions
 end
@@ -1292,6 +1315,7 @@ function COMMANDER:CheckTransportQueue()
       
       -- Weight of the heaviest cargo group. Necessary condition that this fits into on carrier unit!
       local weightGroup=0
+      local TotalWeight=0
       
       -- Calculate the max weight so we know which cohorts can provide carriers.
       if #cargoOpsGroups>0 then  
@@ -1301,13 +1325,14 @@ function COMMANDER:CheckTransportQueue()
           if weight>weightGroup then
             weightGroup=weight
           end
+          TotalWeight=TotalWeight+weight
         end    
       end
       
       if weightGroup>0 then
     
         -- Recruite assets from legions.      
-        local recruited, assets, legions=self:RecruitAssetsForTransport(transport, weightGroup)
+        local recruited, assets, legions=self:RecruitAssetsForTransport(transport, weightGroup, TotalWeight)
         
         if recruited then
         
@@ -1344,10 +1369,12 @@ end
 --- Recruit assets for a given OPS transport.
 -- @param #COMMANDER self
 -- @param Ops.OpsTransport#OPSTRANSPORT Transport The OPS transport.
+-- @param #number CargoWeight Weight of the heaviest cargo group.
+-- @param #number TotalWeight Total weight of all cargo groups.
 -- @return #boolean If `true`, enough assets could be recruited.
 -- @return #table Recruited assets.
 -- @return #table Legions that have recruited assets.
-function COMMANDER:RecruitAssetsForTransport(Transport, CargoWeight)
+function COMMANDER:RecruitAssetsForTransport(Transport, CargoWeight, TotalWeight)
   
   if CargoWeight==0 then
     -- No cargo groups!
@@ -1381,7 +1408,7 @@ function COMMANDER:RecruitAssetsForTransport(Transport, CargoWeight)
   local NreqMin,NreqMax=Transport:GetRequiredCarriers()
   
   -- Recruit assets and legions.
-  local recruited, assets, legions=LEGION.RecruitCohortAssets(Cohorts, AUFTRAG.Type.OPSTRANSPORT, nil, NreqMin, NreqMax, TargetVec2, nil, nil, nil, CargoWeight)
+  local recruited, assets, legions=LEGION.RecruitCohortAssets(Cohorts, AUFTRAG.Type.OPSTRANSPORT, nil, NreqMin, NreqMax, TargetVec2, nil, nil, nil, CargoWeight, TotalWeight)
 
   return recruited, assets, legions  
 end
@@ -1389,6 +1416,31 @@ end
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- Resources
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--- Check if limit of missions has been reached.
+-- @param #COMMANDER self 
+-- @param #string MissionType Type of mission.
+-- @return #boolean If `true`, mission limit has **not** been reached. If `false`, limit has been reached.
+function COMMANDER:_CheckMissionLimit(MissionType)
+
+  local limit=self.limitMission[MissionType]
+  
+  if limit then
+  
+    if MissionType=="Total" then
+      MissionType=AUFTRAG.Type    
+    end
+  
+    local N=self:CountMissions(MissionType, true)
+    
+    if N>=limit then
+      return false
+    end
+  end
+  
+  return true
+end
+
 
 --- Count assets of all assigned legions.
 -- @param #COMMANDER self
@@ -1403,6 +1455,31 @@ function COMMANDER:CountAssets(InStock, MissionTypes, Attributes)
     local legion=_legion --Ops.Legion#LEGION
     N=N+legion:CountAssets(InStock, MissionTypes, Attributes)
   end
+
+  return N
+end
+
+--- Count assets of all assigned legions.
+-- @param #COMMANDER self
+-- @param #table MissionTypes (Optional) Count only missions of these types. Default is all types.
+-- @param #boolean OnlyRunning If `true`, only count running missions.
+-- @return #number Amount missions.
+function COMMANDER:CountMissions(MissionTypes, OnlyRunning)
+
+  local N=0
+  for _,_mission in pairs(self.missionqueue) do
+    local mission=_mission --Ops.Auftrag#AUFTRAG
+    
+    if (not OnlyRunning) or (mission.statusCommander~=AUFTRAG.Status.PLANNED) then
+
+      -- Check if this mission type is requested.
+      if AUFTRAG.CheckMissionType(mission.type, MissionTypes) then
+        N=N+1
+      end
+      
+    end
+  end
+
 
   return N
 end

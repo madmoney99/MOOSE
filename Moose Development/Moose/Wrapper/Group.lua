@@ -765,8 +765,7 @@ end
 
 --- Returns the average velocity Vec3 vector.
 -- @param Wrapper.Group#GROUP self
--- @return DCS#Vec3 The velocity Vec3 vector
--- @return #nil The GROUP is not existing or alive.  
+-- @return DCS#Vec3 The velocity Vec3 vector or `#nil` if the GROUP is not existing or alive.  
 function GROUP:GetVelocityVec3()
   self:F2( self.GroupName )
 
@@ -1009,9 +1008,8 @@ end
 
 --- Returns a random @{DCS#Vec3} vector (point in 3D of the UNIT within the mission) within a range around the first UNIT of the GROUP.
 -- @param #GROUP self
--- @param #number Radius
--- @return DCS#Vec3 The random 3D point vector around the first UNIT of the GROUP.
--- @return #nil The GROUP is invalid or empty
+-- @param #number Radius Radius in meters.
+-- @return DCS#Vec3 The random 3D point vector around the first UNIT of the GROUP or #nil The GROUP is invalid or empty. 
 -- @usage 
 -- -- If Radius is ignored, returns the DCS#Vec3 of first UNIT of the GROUP
 function GROUP:GetRandomVec3(Radius)
@@ -1032,8 +1030,7 @@ end
 
 --- Returns the mean heading of every UNIT in the GROUP in degrees
 -- @param #GROUP self
--- @return #number mean heading of the GROUP
--- @return #nil The first UNIT is not existing or alive.
+-- @return #number Mean heading of the GROUP in degrees or #nil The first UNIT is not existing or alive.
 function GROUP:GetHeading()
   self:F2(self.GroupName)
 
@@ -1061,8 +1058,8 @@ end
 --- Return the fuel state and unit reference for the unit with the least
 -- amount of fuel in the group.
 -- @param #GROUP self
--- @return #number The fuel state of the unit with the least amount of fuel
--- @return #Unit reference to #Unit object for further processing
+-- @return #number The fuel state of the unit with the least amount of fuel.
+-- @return #Unit reference to #Unit object for further processing.
 function GROUP:GetFuelMin()
   self:F3(self.ControllableName)
 
@@ -2607,6 +2604,41 @@ function GROUP:GetSkill()
   local name = unit:GetName()
   local skill = _DATABASE.Templates.Units[name].Template.skill or "Random"
   return skill
+end
+
+
+--- Get the unit in the group with the highest threat level, which is still alive.
+-- @param #GROUP self
+-- @return Wrapper.Unit#UNIT The most dangerous unit in the group.
+-- @return #number Threat level of the unit.
+function GROUP:GetHighestThreat()
+
+  -- Get units of the group.
+  local units=self:GetUnits()
+
+  if units then
+
+    local threat=nil ; local maxtl=0
+    for _,_unit in pairs(units or {}) do
+      local unit=_unit --Wrapper.Unit#UNIT
+
+      if unit and unit:IsAlive() then
+
+        -- Threat level of group.
+        local tl=unit:GetThreatLevel()
+
+        -- Check if greater the current threat.
+        if tl>maxtl then
+          maxtl=tl
+          threat=unit
+        end        
+      end
+    end
+
+    return threat, maxtl    
+  end
+
+  return nil, nil
 end
 
 --do -- Smoke

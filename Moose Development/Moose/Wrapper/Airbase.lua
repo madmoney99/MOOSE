@@ -316,6 +316,9 @@ AIRBASE.PersianGulf = {
 -- * AIRBASE.TheChannel.Lympne
 -- * AIRBASE.TheChannel.Detling
 -- * AIRBASE.TheChannel.High_Halden
+-- * AIRBASE.TheChannel.Biggin_Hill
+-- * AIRBASE.TheChannel.Eastchurch
+-- * AIRBASE.TheChannel.Headcorn
 --
 -- @field TheChannel
 AIRBASE.TheChannel = {
@@ -328,6 +331,9 @@ AIRBASE.TheChannel = {
   ["Lympne"] = "Lympne",
   ["Detling"] = "Detling",
   ["High_Halden"] = "High Halden",
+  ["Biggin_Hill"] = "Biggin Hill",
+  ["Eastchurch"] = "Eastchurch",
+  ["Headcorn"] = "Headcorn",
 }
 
 --- Airbases of the Syria map:
@@ -346,7 +352,6 @@ AIRBASE.TheChannel = {
 -- * AIRBASE.Syria.Wujah_Al_Hajar
 -- * AIRBASE.Syria.Al_Dumayr
 -- * AIRBASE.Syria.Gazipasa
--- * AIRBASE.Syria.Ru_Convoy_4
 -- * AIRBASE.Syria.Hatay
 -- * AIRBASE.Syria.Nicosia
 -- * AIRBASE.Syria.Pinarbashi
@@ -364,7 +369,6 @@ AIRBASE.TheChannel = {
 -- * AIRBASE.Syria.Akrotiri
 -- * AIRBASE.Syria.Naqoura
 -- * AIRBASE.Syria.Gaziantep
--- * AIRBASE.Syria.CVN_71
 -- * AIRBASE.Syria.Sayqal
 -- * AIRBASE.Syria.Tiyas
 -- * AIRBASE.Syria.Shayrat
@@ -385,6 +389,16 @@ AIRBASE.TheChannel = {
 -- * AIRBASE.Syria.Beirut_Rafic_Hariri
 -- * AIRBASE.Syria.An_Nasiriyah
 -- * AIRBASE.Syria.Abu_al_Duhur
+-- * AIRBASE.Syria.At_Tanf
+-- * AIRBASE.Syria.H3
+-- * AIRBASE.Syria.H3_Northwest
+-- * AIRBASE.Syria.H3_Southwest
+-- * AIRBASE.Syria.Kharab_Ishk
+-- * AIRBASE.Syria.Raj_al_Issa_East
+-- * AIRBASE.Syria.Raj_al_Issa_West
+-- * AIRBASE.Syria.Ruwayshid
+-- * AIRBASE.Syria.Sanliurfa
+-- * AIRBASE.Syria.Tal_Siman
 --
 --@field Syria
 AIRBASE.Syria={
@@ -402,7 +416,7 @@ AIRBASE.Syria={
   ["Wujah_Al_Hajar"]="Wujah Al Hajar",
   ["Al_Dumayr"]="Al-Dumayr",
   ["Gazipasa"]="Gazipasa",
-  ["Ru_Convoy_4"]="Ru Convoy-4",
+  --["Ru_Convoy_4"]="Ru Convoy-4",
   ["Hatay"]="Hatay",
   ["Nicosia"]="Nicosia",
   ["Pinarbashi"]="Pinarbashi",
@@ -440,9 +454,18 @@ AIRBASE.Syria={
   ["Beirut_Rafic_Hariri"]="Beirut-Rafic Hariri",
   ["An_Nasiriyah"]="An Nasiriyah",
   ["Abu_al_Duhur"]="Abu al-Duhur",
+  ["At_Tanf"]="At Tanf",
+  ["H3"]="H3",
+  ["H3_Northwest"]="H3 Northwest",
+  ["H3_Southwest"]="H3 Southwest",
+  ["Kharab_Ishk"]="Kharab Ishk",
+  ["Raj_al_Issa_East"]="Raj al Issa East",
+  ["Raj_al_Issa_West"]="Raj al Issa West",
+  ["Ruwayshid"]="Ruwayshid",
+  ["Sanliurfa"]="Sanliurfa",
+  ["Tal_Siman"]="Tal Siman",
+  ["Deir_ez-Zor"] = "Deir ez-Zor",
 }
-
-
 
 --- Airbases of the Mariana Islands map:
 --

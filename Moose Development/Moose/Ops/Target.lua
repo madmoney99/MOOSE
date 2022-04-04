@@ -990,8 +990,12 @@ function TARGET:GetTargetVec3(Target)
 
     if object and object:IsAlive() then
       local vec3=object:GetVec3()
-      return vec3
       
+      if vec3 then
+        return vec3
+      else
+        return nil
+      end
     else
     
       return nil
@@ -1204,7 +1208,7 @@ function TARGET:GetCoordinate()
 
   end
 
-  self:E(self.lid..string.format("ERROR: Cannot get coordinate of target %s", self.name))
+  self:E(self.lid..string.format("ERROR: Cannot get coordinate of target %s", tostring(self.name)))
   return nil
 end
 

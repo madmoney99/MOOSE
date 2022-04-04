@@ -166,9 +166,23 @@ FLIGHTGROUP.Attribute = {
   OTHER="Other",
 }
 
+--- Radio Text.
+-- @type FLIGHTGROUP.RadioText
+-- @field #string normal
+-- @field #string enhanced
+
+--- Radio messages.
+-- @type FLIGHTGROUP.RadioMessage
+-- @field #FLIGHTGROUP.RadioText AIRBORNE
+-- @field #FLIGHTGROUP.RadioText TAXIING
+FLIGHTGROUP.RadioMessage = {
+  AIRBORNE={normal="Airborn", enhanced="Airborn"},
+  TAXIING={normal="Taxiing", enhanced="Taxiing"},
+}
+
 --- FLIGHTGROUP class version.
 -- @field #string version
-FLIGHTGROUP.version="0.7.0"
+FLIGHTGROUP.version="0.7.1"
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- TODO list
@@ -730,60 +744,6 @@ end
 -- Status
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
----- Update status.
--- @param #FLIGHTGROUP self
-function FLIGHTGROUP:onbeforeStatus(From, Event, To)
-
-  -- First we check if elements are still alive. Could be that they were despawned without notice, e.g. when landing on a too small airbase.
-  for i,_element in pairs(self.elements) do
-    local element=_element --Ops.OpsGroup#OPSGROUP.Element
-
-    -- Check that element is not already dead or not yet alive.
-    if element.status~=OPSGROUP.ElementStatus.DEAD and element.status~=OPSGROUP.ElementStatus.INUTERO then
-
-      -- Unit shortcut.
-      local unit=element.unit
-
-      local isdead=false
-      if unit and unit:IsAlive() then
-
-        -- Get life points.
-        local life=unit:GetLife() or 0
-
-        -- Units with life <=1 are dead.
-        if life<=1 then
-          --env.info(string.format("FF unit %s: live<=1 in status at T=%.3f", unit:GetName(), timer.getTime()))
-          isdead=true
-        end
-
-      else
-        -- Not alive any more.
-        --env.info(string.format("FF unit %s: NOT alive in status at T=%.3f", unit:GetName(), timer.getTime()))
-        isdead=true
-      end
-
-      -- This one is dead.
-      if isdead then
-        local text=string.format("Element %s is dead at t=%.3f but has status %s! Maybe despawned without notice or landed at a too small airbase. Calling ElementDead in 60 sec to give other events a chance",
-        tostring(element.name), timer.getTime(), tostring(element.status))
-        self:T(self.lid..text)
-        self:__ElementDead(60, element)
-      end
-
-    end
-  end
-
-  if self:IsDead() then
-    self:T(self.lid..string.format("Onbefore Status DEAD ==> false"))
-    return false
-  elseif self:IsStopped() then
-    self:T(self.lid..string.format("Onbefore Status STOPPED ==> false"))
-    return false
-  end
-
-  return true
-end
-
 --- Status update.
 -- @param #FLIGHTGROUP self
 function FLIGHTGROUP:Status()
@@ -845,7 +805,10 @@ function FLIGHTGROUP:Status()
         end
       end
     end
-    
+
+  else
+    -- Check damage.
+    self:_CheckDamage()      
   end
     
   ---
@@ -1238,7 +1201,7 @@ function FLIGHTGROUP:onafterElementSpawned(From, Event, To, Element)
   -- Set element status.
   self:_UpdateStatus(Element, OPSGROUP.ElementStatus.SPAWNED)
 
-  if Element.unit:InAir(true) then
+  if Element.unit:InAir(not self.isHelo) then  -- Setting check because of problems with helos dynamically spawned where inAir WRONGLY returned true if spawned at an airbase or farp!
     -- Trigger ElementAirborne event. Add a little delay because spawn is also delayed!
     self:__ElementAirborne(0.11, Element)
   else
@@ -1568,6 +1531,12 @@ function FLIGHTGROUP:onafterParking(From, Event, To)
   
   -- Set current airbase.
   self.currbase=airbase
+  
+  -- Set homebase to current airbase if not defined yet.
+  -- This is necessary, e.g, when flights are spawned at an airbase because they do not have a takeoff waypoint.
+  if not self.homebase then
+    self.homebase=airbase
+  end
 
   -- Parking time stamp.
   self.Tparking=timer.getAbsTime()
@@ -1953,6 +1922,9 @@ function FLIGHTGROUP:onbeforeUpdateRoute(From, Event, To, n, N)
       elseif task.dcstask.id=="ReconMission" then
         -- For recon missions, we need to allow the update as we insert new waypoints.
         self:T2(self.lid.."Allowing update route for Task: ReconMission")
+      elseif task.dcstask.id=="Hover" then
+        -- For recon missions, we need to allow the update as we insert new waypoints.
+        self:T2(self.lid.."Allowing update route for Task: Hover")  
       elseif task.description and task.description=="Task_Land_At" then
         -- We allow this
         self:T2(self.lid.."Allowing update route for Task: Task_Land_At")

@@ -473,10 +473,10 @@ UTILS.KnotsToMps = function( knots )
   end
 end
 
---- Convert temperature from Celsius to Farenheit.
+--- Convert temperature from Celsius to Fahrenheit.
 -- @param #number Celcius Temperature in degrees Celsius.
--- @return #number Temperature in degrees Farenheit.
-UTILS.CelciusToFarenheit = function( Celcius )
+-- @return #number Temperature in degrees Fahrenheit.
+UTILS.CelsiusToFahrenheit = function( Celcius )
   return Celcius * 9/5 + 32
 end
 
@@ -1097,12 +1097,28 @@ function UTILS.VecSubstract(a, b)
   return {x=a.x-b.x, y=a.y-b.y, z=a.z-b.z}
 end
 
+--- Calculate the difference between two 2D vectors by substracting the x,y components from each other.
+-- @param DCS#Vec2 a Vector in 2D with x, y components.
+-- @param DCS#Vec2 b Vector in 2D with x, y components.
+-- @return DCS#Vec2 Vector c=a-b with c(i)=a(i)-b(i), i=x,y.
+function UTILS.Vec2Substract(a, b)
+  return {x=a.x-b.x, y=a.y-b.y}
+end
+
 --- Calculate the total vector of two 3D vectors by adding the x,y,z components of each other.
 -- @param DCS#Vec3 a Vector in 3D with x, y, z components.
 -- @param DCS#Vec3 b Vector in 3D with x, y, z components.
 -- @return DCS#Vec3 Vector c=a+b with c(i)=a(i)+b(i), i=x,y,z.
 function UTILS.VecAdd(a, b)
   return {x=a.x+b.x, y=a.y+b.y, z=a.z+b.z}
+end
+
+--- Calculate the total vector of two 2D vectors by adding the x,y components of each other.
+-- @param DCS#Vec2 a Vector in 2D with x, y components.
+-- @param DCS#Vec2 b Vector in 2D with x, y components.
+-- @return DCS#Vec2 Vector c=a+b with c(i)=a(i)+b(i), i=x,y.
+function UTILS.Vec2Add(a, b)
+  return {x=a.x+b.x, y=a.y+b.y}
 end
 
 --- Calculate the angle between two 3D vectors.
@@ -1318,26 +1334,6 @@ function UTILS.GetMissionDayOfYear(Time)
   local d=UTILS.GetMissionDay(Time)
 
   return UTILS.GetDayOfYear(Year, Month, Day)+d
-
-end
-
---- Returns the current date.
--- @return #string Mission date in yyyy/mm/dd format.
--- @return #number The year anno domini.
--- @return #number The month.
--- @return #number The day.
-function UTILS.GetDate()
-
-  -- Mission start date
-  local date, year, month, day=UTILS.GetDCSMissionDate()
-
-  local time=timer.getAbsTime()
-
-  local clock=UTILS.SecondsToClock(time, false)
-
-  local x=tonumber(UTILS.Split(clock, "+")[2])
-
-  local day=day+x
 
 end
 
@@ -1672,8 +1668,8 @@ function UTILS.GetOSTime()
 end
 
 --- Shuffle a table accoring to Fisher Yeates algorithm
---@param #table t Table to be shuffled
---@return #table
+--@param #table t Table to be shuffled.
+--@return #table Shuffled table.
 function UTILS.ShuffleTable(t)
   if t == nil or type(t) ~= "table" then
     BASE:I("Error in ShuffleTable: Missing or wrong type of Argument")
@@ -1689,6 +1685,32 @@ function UTILS.ShuffleTable(t)
     table.remove(t,r)
   end
   return TempTable
+end
+
+--- Get a random element of a table.
+--@param #table t Table.
+--@param #boolean replace If `true`, the drawn element is replaced, i.e. not deleted.
+--@return #number Table element.
+function UTILS.GetRandomTableElement(t, replace)
+
+  if t == nil or type(t) ~= "table" then
+    BASE:I("Error in ShuffleTable: Missing or wrong type of Argument")
+    return
+  end
+  
+  math.random()
+  math.random()
+  math.random()
+  
+  local r=math.random(#t)
+  
+  local element=t[r]
+  
+  if not replace then
+    table.remove(t, r)
+  end
+  
+  return element
 end
 
 --- (Helicopter) Check if one loading door is open.
@@ -1749,6 +1771,11 @@ function UTILS.IsLoadingDoorOpen( unit_name )
       if string.find(type_name, "UH-60L" ) and unit:getDrawArgumentValue(38) == 1 or unit:getDrawArgumentValue(400) == 1 then
           BASE:T(unit_name .. " front door(s) are open")
           ret_val =  true
+      end
+      
+      if string.find(type_name, "AH-64D") then
+         BASE:T(unit_name .. " front door(s) are open")
+         ret_val =  true -- no doors on this one ;)
       end
       
       if ret_val == false then

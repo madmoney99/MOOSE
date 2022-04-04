@@ -28,7 +28,7 @@ do
 
 ------------------------------------------------------
 --- **CTLD_ENGINEERING** class, extends Core.Base#BASE
---- @type CTLD_ENGINEERING
+-- @type CTLD_ENGINEERING
 -- @field #string ClassName
 -- @field #string lid
 -- @field #string Name
@@ -870,8 +870,12 @@ do
 -- 
 -- ## 5. Support for Hercules mod by Anubis
 -- 
--- Basic support for the Hercules mod By Anubis has been build into CTLD. Currently this does **not** cover objects and troops which can
--- be loaded from the Rearm/Refuel menu, i.e. you can drop them into the field, but you cannot use them in functions scripted with this class.
+-- Basic support for the Hercules mod By Anubis has been build into CTLD - that is you can load/drop/build the same objects as the helicopters. 
+-- To also cover objects and troops which can be loaded from the groud crew Rearm/Refuel menu, you need to use @{#CTLD_HERCULES.New}() and link
+-- this object to your CTLD setup. In this case, do **not** use the `Hercules_Cargo.lua` or `Hercules_Cargo_CTLD.lua` which are part of the mod 
+-- in your mission!
+-- 
+-- ### 5.1 Create an own CTLD instance and allow the usage of the Hercules mod:
 --
 --              local my_ctld = CTLD:New(coalition.side.BLUE,{"Helicargo", "Hercules"},"Lufttransportbrigade I")
 -- 
@@ -882,9 +886,32 @@ do
 --              my_ctld.HercMaxAngels = 2000 -- for troop/cargo drop via chute in meters, ca 6000 ft
 --              my_ctld.HercMaxSpeed = 77 -- 77mps or 270kph or 150kn
 -- 
+-- Hint: you can **only** airdrop from the Hercules if you are "in parameters", i.e. at or below `HercMaxSpeed` and in the AGL bracket between
+-- `HercMinAngels` and `HercMaxAngels`!
+-- 
 -- Also, the following options need to be set to `true`:
 -- 
 --              my_ctld.useprefix = true -- this is true by default and MUST BE ON. 
+-- 
+-- ### 5.2 Integrate Hercules ground crew loadable objects 
+-- 
+-- Add ground crew loadable objects to your CTLD instance like so, where `my_ctld` is the previously created CTLD instance:
+-- 
+--            local herccargo = CTLD_HERCULES:New("blue", "Hercules Test", my_ctld)
+--            
+-- You also need:
+--  
+-- * A template called "Infantry" for 10 Paratroopers (as set via herccargo.infantrytemplate). 
+-- * Depending on what you are loading with the help of the ground crew, there are 42 more templates for the various vehicles that are loadable. 
+-- 
+-- There's a **quick check output in the `dcs.log`** which tells you what's there and what not.
+-- E.g.:
+--            ...Checking template for APC BTR-82A Air [24998lb] (BTR-82A) ... MISSING)
+--            ...Checking template for ART 2S9 NONA Skid [19030lb] (SAU 2-C9) ... MISSING)
+--            ...Checking template for EWR SBORKA Air [21624lb] (Dog Ear radar) ... MISSING)
+--            ...Checking template for Transport Tigr Air [15900lb] (Tigr_233036) ... OK)
+--            
+-- Expected template names are the ones in the rounded brackets.
 -- 
 -- Standard transport capabilities as per the real Hercules are:
 -- 
@@ -914,8 +941,8 @@ do
 -- @field #CTLD
 CTLD = {
   ClassName       = "CTLD",
-  verbose         =     0,
-  lid             =   "",
+  verbose         = 0,
+  lid             = "",
   coalition       = 1,
   coalitiontxt    = "blue",
   PilotGroups = {}, -- #GROUP_SET of heli pilots
@@ -924,7 +951,6 @@ CTLD = {
   FreeUHFFrequencies = {}, -- Table of UHF
   FreeFMFrequencies = {}, -- Table of FM
   CargoCounter = 0,
-  wpZones = {},
   Cargo_Troops = {}, -- generic troops objects
   Cargo_Crates = {}, -- generic crate objects
   Loaded_Cargo = {}, -- cargo aboard units
@@ -1017,11 +1043,12 @@ CTLD.UnitTypes = {
     ["Hercules"] = {type="Hercules", crates=true, troops=true, cratelimit = 7, trooplimit = 64, length = 25, cargoweightlimit = 19000}, -- 19t cargo, 64 paratroopers. 
     --Actually it's longer, but the center coord is off-center of the model.
     ["UH-60L"] = {type="UH-60L", crates=true, troops=true, cratelimit = 2, trooplimit = 20, length = 16, cargoweightlimit = 3500}, -- 4t cargo, 20 (unsec) seats
+    ["AH-64D_BLK_II"] = {type="AH-64D_BLK_II", crates=false, troops=true, cratelimit = 0, trooplimit = 2, length = 17, cargoweightlimit = 200}, -- 2 ppl **outside** the helo
 }
 
 --- CTLD class version.
 -- @field #string version
-CTLD.version="1.0.6"
+CTLD.version="1.0.10"
 
 --- Instantiate a new CTLD.
 -- @param #CTLD self
@@ -1149,6 +1176,7 @@ function CTLD:New(Coalition, Prefixes, Alias)
   self.smokedistance = 2000
   self.movetroopstowpzone = true
   self.movetroopsdistance = 5000
+  self.troopdropzoneradius = 100
   
   -- added support Hercules Mod
   self.enableHercules = false
@@ -1415,6 +1443,17 @@ function CTLD:_GenerateVHFrequencies()
   self.FreeVHFFrequencies = {}
   self.UsedVHFFrequencies = {}
   self.FreeVHFFrequencies = UTILS.GenerateVHFrequencies()
+  return self
+end
+
+--- (User) Set drop zone radius for troop drops in meters. Minimum distance is 25m for security reasons.
+-- @param #CTLD self
+-- @param #number Radius The radius to use.
+function CTLD:SetTroopDropZoneRadius(Radius)
+  self:T(self.lid .. " SetTroopDropZoneRadius")
+  local tradius = Radius or 100
+  if tradius < 25 then tradius = 25 end
+  self.troopdropzoneradius = tradius
   return self
 end
 
@@ -1810,6 +1849,8 @@ function CTLD:_GetCrates(Group, Unit, Cargo, number, drop)
   local drop = drop or false
   local ship = nil
   local width = 20
+  local distance = nil
+  local zone = nil
   if not drop then 
     inzone = self:IsUnitInZone(Unit,CTLD.CargoZoneType.LOAD)
     if not inzone then
@@ -1832,7 +1873,7 @@ function CTLD:_GetCrates(Group, Unit, Cargo, number, drop)
   local capabilities = self:_GetUnitCapabilities(Unit) -- #CTLD.UnitCapabilities
   local canloadcratesno = capabilities.cratelimit
   local loaddist = self.CrateDistance or 35
-  local nearcrates, numbernearby = self:_FindCratesNearby(Group,Unit,loaddist)
+  local nearcrates, numbernearby = self:_FindCratesNearby(Group,Unit,loaddist,true)
   if numbernearby >= canloadcratesno and not drop then
     self:_SendMessage("There are enough crates nearby already! Take care of those first!", 10, false, Group)
     return self
@@ -2015,7 +2056,7 @@ end
 function CTLD:_ListCratesNearby( _group, _unit)
   self:T(self.lid .. " _ListCratesNearby")
   local finddist = self.CrateDistance or 35
-  local crates,number = self:_FindCratesNearby(_group,_unit, finddist) -- #table
+  local crates,number = self:_FindCratesNearby(_group,_unit, finddist,true) -- #table
   if number > 0 then
     local text = REPORT:New("Crates Found Nearby:")
     text:Add("------------------------------------------------------------")
@@ -2072,9 +2113,10 @@ end
 -- @param Wrapper.Group#GROUP _group Group
 -- @param Wrapper.Unit#UNIT _unit Unit
 -- @param #number _dist Distance
+-- @param #boolean _ignoreweight Find everything in range, ignore loadable weight
 -- @return #table Table of crates
 -- @return #number Number Number of crates found
-function CTLD:_FindCratesNearby( _group, _unit, _dist)
+function CTLD:_FindCratesNearby( _group, _unit, _dist, _ignoreweight)
   self:T(self.lid .. " _FindCratesNearby")
   local finddist = _dist
   local location = _group:GetCoordinate()
@@ -2082,11 +2124,18 @@ function CTLD:_FindCratesNearby( _group, _unit, _dist)
   -- cycle
   local index = 0
   local found = {}
-  local loadedmass = self:_GetUnitCargoMass(_unit)
-  local unittype = _unit:GetTypeName()
-  local capabilities = self:_GetUnitCapabilities(_unit) -- #CTLD.UnitCapabilities
-  local maxmass = capabilities.cargoweightlimit
-  local maxloadable = maxmass - loadedmass
+  local loadedmass = 0
+  local unittype = "none"
+  local capabilities = {}
+  local maxmass = 2000
+  local maxloadable = 2000
+  if not _ignoreweight then
+    loadedmass = self:_GetUnitCargoMass(_unit)
+    unittype = _unit:GetTypeName()
+    capabilities = self:_GetUnitCapabilities(_unit) -- #CTLD.UnitCapabilities
+    maxmass = capabilities.cargoweightlimit or 2000
+    maxloadable = maxmass - loadedmass 
+  end
   self:T(self.lid .. " Max loadable mass: " .. maxloadable)
   for _,_cargoobject in pairs (existingcrates) do
     local cargo = _cargoobject -- #CTLD_CARGO
@@ -2097,7 +2146,7 @@ function CTLD:_FindCratesNearby( _group, _unit, _dist)
     if static and static:IsAlive() then
       local staticpos = static:GetCoordinate()
       local distance = self:_GetDistance(location,staticpos)
-      if distance <= finddist and static and weight <= maxloadable then
+      if distance <= finddist and static and (weight <= maxloadable or _ignoreweight) then 
         index = index + 1
         table.insert(found, staticid, cargo)
         maxloadable = maxloadable - weight
@@ -2155,7 +2204,7 @@ function CTLD:_LoadCratesNearby(Group, Unit)
     end
     -- get nearby crates
     local finddist = self.CrateDistance or 35
-    local nearcrates,number = self:_FindCratesNearby(Group,Unit,finddist) -- #table
+    local nearcrates,number = self:_FindCratesNearby(Group,Unit,finddist,false) -- #table
     self:T(self.lid .. " Crates found: " .. number)
     if number == 0 and self.hoverautoloading then
       return self -- exit
@@ -2243,6 +2292,7 @@ end
 -- @return #number mass in kgs
 function CTLD:_GetUnitCargoMass(Unit) 
   self:T(self.lid .. " _GetUnitCargoMass")
+  if not Unit then return 0 end
   local unitname = Unit:GetName()
   local loadedcargo = self.Loaded_Cargo[unitname] or {} -- #CTLD.LoadedCargo
   local loadedmass = 0 -- #number
@@ -2482,7 +2532,7 @@ function CTLD:_UnloadTroops(Group, Unit)
           local name = cargo:GetName() or "none"
           local temptable = cargo:GetTemplates() or {}
           local position = Group:GetCoordinate()
-          local zoneradius = 100 -- drop zone radius
+          local zoneradius = self.troopdropzoneradius or 100 -- drop zone radius
           local factor = 1
           if IsHerc then
             factor = cargo:GetCratesNeeded() or 1 -- spread a bit more if airdropping
@@ -2651,7 +2701,7 @@ function CTLD:_BuildCrates(Group, Unit,Engineering)
   end
   -- get nearby crates
   local finddist = self.CrateDistance or 35
-  local crates,number = self:_FindCratesNearby(Group,Unit, finddist) -- #table
+  local crates,number = self:_FindCratesNearby(Group,Unit, finddist,true) -- #table
   local buildables = {}
   local foundbuilds = false
   local canbuild = false
@@ -2735,7 +2785,7 @@ function CTLD:_RepairCrates(Group, Unit, Engineering)
   self:T(self.lid .. " _RepairCrates")
   -- get nearby crates
   local finddist = self.CrateDistance or 35
-  local crates,number = self:_FindCratesNearby(Group,Unit,finddist) -- #table
+  local crates,number = self:_FindCratesNearby(Group,Unit,finddist,true) -- #table
   local buildables = {}
   local foundbuilds = false
   local canbuild = false
@@ -3690,8 +3740,8 @@ end
   -- @param #boolean Cantroops Unit can load troops. Default false.
   -- @param #number Cratelimit Unit can carry number of crates. Default 0.
   -- @param #number Trooplimit Unit can carry number of troops. Default 0.
-  -- @param #number Length Unit lenght (in mteres) for the load radius. Default 20.
-  -- @param #number Maxcargoweight Maxmimum weight in kgs this helo can carry. Default 0.
+  -- @param #number Length Unit lenght (in metres) for the load radius. Default 20.
+  -- @param #number Maxcargoweight Maxmimum weight in kgs this helo can carry. Default 500.
   function CTLD:UnitCapabilities(Unittype, Cancrates, Cantroops, Cratelimit, Trooplimit, Length, Maxcargoweight)
     self:T(self.lid .. " UnitCapabilities")
     local unittype =  nil
@@ -3704,6 +3754,13 @@ end
     else
       return self
     end
+    local length = 20
+    local maxcargo = 500
+    local existingcaps = self.UnitTypes[unittype] -- #CTLD.UnitCapabilities
+    if existingcaps then
+      length = existingcaps.length or 20
+      maxcargo = existingcaps.cargoweightlimit or 500
+    end
     -- set capabilities
     local capabilities = {} -- #CTLD.UnitCapabilities
     capabilities.type = unittype
@@ -3711,8 +3768,8 @@ end
     capabilities.troops = Cantroops or false
     capabilities.cratelimit = Cratelimit or  0
     capabilities.trooplimit = Trooplimit or 0
-    capabilities.length = Length or 20
-    capabilities.cargoweightlimit = Maxcargoweight or 0
+    capabilities.length = Length or length
+    capabilities.cargoweightlimit = Maxcargoweight or maxcargo
     self.UnitTypes[unittype] = capabilities
     return self
   end
@@ -3758,8 +3815,8 @@ end
       local ucoord = Unit:GetCoordinate()
       local gheight = ucoord:GetLandHeight()
       local aheight = uheight - gheight -- height above ground
-      local maxh = self.HercMinAngels-- 1500m
-      local minh =  self.HercMaxAngels -- 5000m
+      local minh = self.HercMinAngels-- 1500m
+      local maxh =  self.HercMaxAngels -- 5000m
       local maxspeed =  self.HercMaxSpeed -- 77 mps
       -- DONE: TEST - Speed test for Herc, should not be above 280kph/150kn
       local kmspeed = uspeed * 3.6
@@ -4004,7 +4061,7 @@ end
       self:T(_engineers.lid .. _engineers:GetStatus())
       if wrenches and wrenches:IsAlive() then
         if engineers:IsStatus("Running") or engineers:IsStatus("Searching") then
-          local crates,number = self:_FindCratesNearby(wrenches,nil, self.EngineerSearch) -- #table
+          local crates,number = self:_FindCratesNearby(wrenches,nil, self.EngineerSearch,true) -- #table
           engineers:Search(crates,number)
         elseif engineers:IsStatus("Moving") then
           engineers:Move()
@@ -5068,7 +5125,7 @@ function CTLD_HERCULES:Cargo_SpawnObjects(Cargo_Drop_initiator,Cargo_Drop_Direct
       self:Soldier_SpawnGroup(Cargo_Drop_initiator,Cargo_Content_position, Cargo_Type_name, CargoHeading, Cargo_Country, 5)
       self:Soldier_SpawnGroup(Cargo_Drop_initiator,Cargo_Content_position, Cargo_Type_name, CargoHeading, Cargo_Country, 10)
     else
-      self:Cargo_SpawnGroup(Cargo_Drop_initiator,Cargo_Content_position, Cargo_Type_name, CargoHeading, Cargo_Country, 0)
+      self:Cargo_SpawnGroup(Cargo_Drop_initiator,Cargo_Content_position, Cargo_Type_name, CargoHeading, Cargo_Country)
     end
   else
     if all_cargo_gets_destroyed == true or Cargo_over_water == true then
