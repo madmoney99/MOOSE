@@ -3,10 +3,20 @@
 -- **Main Features:**
 --
 --    * Manage squadrons.
+--    * Launch A2A and A2G missions (AUFTRAG)
+-- 
+-- 
+-- ===
+--
+-- ## Example Missions:
+--
+-- Demo missions can be found on [github](https://github.com/FlightControl-Master/MOOSE_MISSIONS/tree/develop/OPS%20-%20Airwing).
 --
 -- ===
 --
 -- ### Author: **funkyfranky**
+-- 
+-- ===
 -- @module Ops.Airwing
 -- @image OPS_AirWing.png
 
@@ -37,10 +47,14 @@
 --
 -- @field Ops.RescueHelo#RESCUEHELO rescuehelo The rescue helo.
 -- @field Ops.RecoveryTanker#RECOVERYTANKER recoverytanker The recoverytanker.
+-- 
+-- @field #string takeoffType Take of type.
+-- @field #boolean despawnAfterLanding Aircraft are despawned after landing.
+-- @field #boolean despawnAfterHolding Aircraft are despawned after holding.
 --
 -- @extends Ops.Legion#LEGION
 
---- *I fly because it releases my mind from the tyranny of petty things* -- Antoine de Saint-Exupery
+--- *I fly because it releases my mind from the tyranny of petty things.* -- Antoine de Saint-Exupery
 --
 -- ===
 --
@@ -161,16 +175,16 @@ AIRWING = {
 
 --- AIRWING class version.
 -- @field #string version
-AIRWING.version="0.9.0"
+AIRWING.version="0.9.2"
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- ToDo list
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
--- TODO: Spawn in air ==> Needs WAREHOUSE update.
--- DONE: Spawn hot.
--- TODO: Make special request to transfer squadrons to anther airwing (or warehouse).
 -- TODO: Check that airbase has enough parking spots if a request is BIG.
+-- DONE: Spawn in air ==> Needs WAREHOUSE update.
+-- DONE: Spawn hot.
+-- DONE: Make special request to transfer squadrons to anther airwing (or warehouse).
 -- DONE: Add squadrons to warehouse.
 -- DONE: Build mission queue.
 -- DONE: Find way to start missions.
@@ -285,6 +299,9 @@ function AIRWING:AddSquadron(Squadron)
   elseif Squadron.attribute==GROUP.Attribute.AIR_TANKER then
     self:NewPayload(Squadron.templategroup, -1, AUFTRAG.Type.TANKER)
   end
+  
+  -- Relocate mission.
+  self:NewPayload(Squadron.templategroup, -1, AUFTRAG.Type.RELOCATECOHORT, 0)
 
   -- Set airwing to squadron.
   Squadron:SetAirwing(self)
@@ -355,6 +372,14 @@ function AIRWING:NewPayload(Unit, Npayloads, MissionTypes,  Performance)
       capability.Performance=50
       table.insert(payload.capabilities, capability)
     end
+    
+    -- Add RELOCATION for all.
+    if not AUFTRAG.CheckMissionType(AUFTRAG.Type.RELOCATECOHORT, MissionTypes) then
+      local capability={}  --Ops.Auftrag#AUFTRAG.Capability
+      capability.MissionType=AUFTRAG.Type.RELOCATECOHORT
+      capability.Performance=50
+      table.insert(payload.capabilities, capability)
+    end    
 
     -- Info
     self:T(self.lid..string.format("Adding new payload from unit %s for aircraft type %s: ID=%d, N=%d (unlimited=%s), performance=%d, missions: %s",
@@ -800,6 +825,77 @@ function AIRWING:SetAirboss(airboss)
   return self
 end
 
+--- Set takeoff type. All assets of this squadron will be spawned with cold (default) or hot engines.
+-- Spawning on runways is not supported.
+-- @param #AIRWING self
+-- @param #string TakeoffType Take off type: "Cold" (default) or "Hot" with engines on or "Air" for spawning in air.
+-- @return #AIRWING self
+function AIRWING:SetTakeoffType(TakeoffType)
+  TakeoffType=TakeoffType or "Cold"
+  if TakeoffType:lower()=="hot" then
+    self.takeoffType=COORDINATE.WaypointType.TakeOffParkingHot
+  elseif TakeoffType:lower()=="cold" then
+    self.takeoffType=COORDINATE.WaypointType.TakeOffParking
+  elseif TakeoffType:lower()=="air" then
+    self.takeoffType=COORDINATE.WaypointType.TurningPoint    
+  else
+    self.takeoffType=COORDINATE.WaypointType.TakeOffParking
+  end
+  return self
+end
+
+--- Set takeoff type cold (default). All assets of this squadron will be spawned with engines off (cold).
+-- @param #AIRWING self
+-- @return #AIRWING self
+function AIRWING:SetTakeoffCold()
+  self:SetTakeoffType("Cold")
+  return self
+end
+
+--- Set takeoff type hot. All assets of this squadron will be spawned with engines on (hot).
+-- @param #AIRWING self
+-- @return #AIRWING self
+function AIRWING:SetTakeoffHot()
+  self:SetTakeoffType("Hot")
+  return self
+end
+
+--- Set takeoff type air. All assets of this squadron will be spawned in air above the airbase.
+-- @param #AIRWING self
+-- @return #AIRWING self
+function AIRWING:SetTakeoffAir()
+  self:SetTakeoffType("Air")
+  return self
+end
+
+--- Set despawn after landing. Aircraft will be despawned after the landing event.
+-- Can help to avoid DCS AI taxiing issues.
+-- @param #AIRWING self
+-- @param #boolean Switch If `true` (default), activate despawn after landing.
+-- @return #AIRWING self
+function AIRWING:SetDespawnAfterLanding(Switch)
+  if Switch then
+    self.despawnAfterLanding=Switch
+  else
+    self.despawnAfterLanding=true
+  end
+  return self
+end
+
+--- Set despawn after holding. Aircraft will be despawned when they arrive at their holding position at the airbase.
+-- Can help to avoid DCS AI taxiing issues.
+-- @param #AIRWING self
+-- @param #boolean Switch If `true` (default), activate despawn after landing.
+-- @return #AIRWING self
+function AIRWING:SetDespawnAfterHolding(Switch)
+  if Switch then
+    self.despawnAfterHolding=Switch
+  else
+    self.despawnAfterHolding=true
+  end
+  return self
+end
+
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- Start & Status
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1146,6 +1242,26 @@ function AIRWING:GetTankerForFlight(flightgroup)
   return nil
 end
 
+--- Add the ability to call back an Ops.Awacs#AWACS object with an FSM call "FlightOnMission(FlightGroup, Mission)".
+-- @param #AIRWING self
+-- @param Ops.Awacs#AWACS ConnectecdAwacs
+-- @return #AIRWING self
+function AIRWING:SetUsingOpsAwacs(ConnectecdAwacs)
+  self:I(self.lid .. "Added AWACS Object: "..ConnectecdAwacs:GetName() or "unknown")
+  self.UseConnectedOpsAwacs = true
+  self.ConnectedOpsAwacs = ConnectecdAwacs
+  return self
+end
+
+--- Remove the ability to call back an Ops.Awacs#AWACS object with an FSM call "FlightOnMission(FlightGroup, Mission)".
+-- @param #AIRWING self
+-- @return #AIRWING self
+function AIRWING:RemoveUsingOpsAwacs()
+  self:I(self.lid .. "Reomve AWACS Object: "..self.ConnectedOpsAwacs:GetName() or "unknown")
+  self.UseConnectedOpsAwacs = false
+  return self
+end
+
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- FSM Events
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1155,11 +1271,14 @@ end
 -- @param #string From From state.
 -- @param #string Event Event.
 -- @param #string To To state.
--- @param Ops.FlightGroup#FLIGHTGROUP ArmyGroup Ops army group on mission.
+-- @param Ops.FlightGroup#FLIGHTGROUP FlightGroup Ops flight group on mission.
 -- @param Ops.Auftrag#AUFTRAG Mission The requested mission.
 function AIRWING:onafterFlightOnMission(From, Event, To, FlightGroup, Mission)
   -- Debug info.
-  self:T(self.lid..string.format("Group %s on %s mission %s", FlightGroup:GetName(), Mission:GetType(), Mission:GetName()))  
+  self:T(self.lid..string.format("Group %s on %s mission %s", FlightGroup:GetName(), Mission:GetType(), Mission:GetName()))
+  if self.UseConnectedOpsAwacs and self.ConnectedOpsAwacs then
+    self.ConnectedOpsAwacs:__FlightOnMission(2,FlightGroup,Mission)
+  end  
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

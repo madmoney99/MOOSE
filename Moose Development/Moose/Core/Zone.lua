@@ -59,6 +59,8 @@
 -- @field #number ZoneProbability A value between 0 and 1. 0 = 0% and 1 = 100% probability.
 -- @field #number DrawID Unique ID of the drawn zone on the F10 map.
 -- @field #table Color Table with four entries, e.g. {1, 0, 0, 0.15}. First three are RGB color code. Fourth is the transparency Alpha value.
+-- @field #number ZoneID ID of zone. Only zones defined in the ME have an ID!
+-- @field #number Surface Type of surface. Only determined at the center of the zone!
 -- @extends Core.Fsm#FSM
 
 
@@ -108,7 +110,9 @@ ZONE_BASE = {
   ZoneName = "",
   ZoneProbability = 1,
   DrawID=nil,
-  Color={}
+  Color={},
+  ZoneID=nil,
+  Sureface=nil,
 }
 
 
@@ -333,15 +337,22 @@ end
 -- @param #ZONE_BASE self
 -- @return #nil The bounding square.
 function ZONE_BASE:GetBoundingSquare()
-  --return { x1 = 0, y1 = 0, x2 = 0, y2 = 0 }
   return nil
+end
+
+--- Get surface type of the zone.
+-- @param #ZONE_BASE self
+-- @return DCS#SurfaceType Type of surface.
+function ZONE_BASE:GetSurfaceType()
+  local coord=self:GetCoordinate()
+  local surface=coord:GetSurfaceType()
+  return surface
 end
 
 --- Bound the zone boundaries with a tires.
 -- @param #ZONE_BASE self
 function ZONE_BASE:BoundZone()
   self:F2()
-
 end
 
 
@@ -620,7 +631,7 @@ function ZONE_RADIUS:DrawZone(Coalition, Color, Alpha, FillColor, FillAlpha, Lin
 
   Color=Color or self:GetColorRGB()
   Alpha=Alpha or 1
-  FillColor=FillColor or Color
+  FillColor=FillColor or UTILS.DeepCopy(Color)
   FillAlpha=FillAlpha or self:GetColorAlpha()
 
   self.DrawID=coordinate:CircleToAll(Radius, Coalition, Color, Alpha, FillColor, FillAlpha, LineType, ReadOnly)
@@ -808,7 +819,7 @@ end
 
 
 --- Scan the zone for the presence of units of the given ObjectCategories.
--- Note that after a zone has been scanned, the zone can be evaluated by:
+-- Note that **only after** a zone has been scanned, the zone can be evaluated by:
 --
 --   * @{ZONE_RADIUS.IsAllInZoneOfCoalition}(): Scan the presence of units in the zone of a coalition.
 --   * @{ZONE_RADIUS.IsAllInZoneOfOtherCoalition}(): Scan the presence of units in the zone of an other coalition.
@@ -817,10 +828,10 @@ end
 --   * @{ZONE_RADIUS.IsNoneInZone}(): Scan if the zone is empty.
 -- @{#ZONE_RADIUS.
 -- @param #ZONE_RADIUS self
--- @param ObjectCategories An array of categories of the objects to find in the zone.
--- @param UnitCategories An array of unit categories of the objects to find in the zone.
+-- @param ObjectCategories An array of categories of the objects to find in the zone. E.g. `{Object.Category.UNIT}`
+-- @param UnitCategories An array of unit categories of the objects to find in the zone. E.g. `{Unit.Category.GROUND_UNIT,Unit.Category.SHIP}`
 -- @usage
---    self.Zone:Scan()
+--    self.Zone:Scan({Object.Category.UNIT},{Unit.Category.GROUND_UNIT})
 --    local IsAttacked = self.Zone:IsSomeInZoneOfCoalition( self.Coalition )
 function ZONE_RADIUS:Scan( ObjectCategories, UnitCategories )
 
@@ -1279,8 +1290,8 @@ end
 
 --- Returns a @{Core.Point#COORDINATE} object reflecting a random 3D location within the zone.
 -- @param #ZONE_RADIUS self
--- @param #number inner (Optional) Minimal distance from the center of the zone. Default is 0.
--- @param #number outer (Optional) Maximal distance from the outer edge of the zone. Default is the radius of the zone.
+-- @param #number inner (Optional) Minimal distance from the center of the zone in meters. Default is 0 m.
+-- @param #number outer (Optional) Maximal distance from the outer edge of the zone in meters. Default is the radius of the zone.
 -- @param #table surfacetypes (Optional) Table of surface types. Can also be a single surface type. We will try max 1000 times to find the right type!
 -- @return Core.Point#COORDINATE The random coordinate.
 function ZONE_RADIUS:GetRandomCoordinate(inner, outer, surfacetypes)
@@ -1860,7 +1871,8 @@ function ZONE_POLYGON_BASE:DrawZone(Coalition, Color, Alpha, FillColor, FillAlph
 
   Color=Color or self:GetColorRGB()
   Alpha=Alpha or 1
-  FillColor=FillColor or Color
+  
+  FillColor=FillColor or UTILS.DeepCopy(Color)
   FillAlpha=FillAlpha or self:GetColorAlpha()
 
 
@@ -1984,6 +1996,18 @@ function ZONE_POLYGON_BASE:IsVec2InZone( Vec2 )
 
   self:T( { InPolygon = InPolygon } )
   return InPolygon
+end
+
+--- Returns if a point is within the zone.
+-- @param #ZONE_POLYGON_BASE self
+-- @param DCS#Vec3 Vec3 The point to test.
+-- @return #boolean true if the point is within the zone.
+function ZONE_POLYGON_BASE:IsVec3InZone( Vec3 )
+  self:F2( Vec3 )
+
+  local InZone = self:IsVec2InZone( { x = Vec3.x, y = Vec3.z } )
+
+  return InZone
 end
 
 --- Define a random @{DCS#Vec2} within the zone.

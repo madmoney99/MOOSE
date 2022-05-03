@@ -529,26 +529,32 @@ function GROUP:HasAttribute(attribute, all)
   -- Get all units of the group.
   local _units=self:GetUnits()
   
-  local _allhave=true
-  local _onehas=false
+  if _units then
   
-  for _,_unit in pairs(_units) do
-    local _unit=_unit --Wrapper.Unit#UNIT
-    if _unit then
-      local _hastit=_unit:HasAttribute(attribute)
-      if _hastit==true then
-        _onehas=true
-      else
-        _allhave=false
-      end
-    end 
+    local _allhave=true
+    local _onehas=false
+    
+    for _,_unit in pairs(_units) do
+      local _unit=_unit --Wrapper.Unit#UNIT
+      if _unit then
+        local _hastit=_unit:HasAttribute(attribute)
+        if _hastit==true then
+          _onehas=true
+        else
+          _allhave=false
+        end
+      end 
+    end
+    
+    if all==true then
+      return _allhave
+    else
+      return _onehas
+    end
+    
   end
   
-  if all==true then
-    return _allhave
-  else
-    return _onehas
-  end
+  return nil
 end
 
 --- Returns the maximum speed of the group.
@@ -563,16 +569,19 @@ function GROUP:GetSpeedMax()
   
     local Units=self:GetUnits()
     
-    local speedmax=0
+    local speedmax=nil
     
     for _,unit in pairs(Units) do
       local unit=unit --Wrapper.Unit#UNIT
+      
       local speed=unit:GetSpeedMax()
-      if speedmax==0 then
-        speedmax=speed
-      elseif speed<speedmax then
+      
+      if speedmax==nil or speed<speedmax then
         speedmax=speed
       end
+      
+      --env.info(string.format("FF unit %s: speed=%.1f, speedmax=%.1f", unit:GetName(), speed, speedmax))
+      
     end
     
     return speedmax
@@ -622,7 +631,7 @@ function GROUP:GetUnits()
   local DCSGroup = self:GetDCSObject()
 
   if DCSGroup then
-    local DCSUnits = DCSGroup:getUnits()
+    local DCSUnits = DCSGroup:getUnits() or {}
     local Units = {}
     for Index, UnitData in pairs( DCSUnits ) do
       Units[#Units+1] = UNIT:Find( UnitData )
@@ -658,6 +667,29 @@ function GROUP:GetPlayerUnits()
   return nil
 end
 
+--- Check if an (air) group is a client or player slot. Information is retrieved from the group template.
+-- @param #GROUP self
+-- @return #boolean If true, group is associated with a client or player slot.
+function GROUP:IsPlayer()
+  
+  -- Get group.
+ -- local group=self:GetGroup()
+    
+  -- Units of template group.
+  local units=self:GetTemplate().units
+  
+  -- Get numbers.
+  for _,unit in pairs(units) do
+      
+    -- Check if unit name matach and skill is Client or Player.
+    if unit.name==self:GetName() and (unit.skill=="Client" or unit.skill=="Player") then
+      return true
+    end
+
+  end
+  
+  return false
+end
 
 --- Returns the UNIT wrapper class with number UnitNumber.
 -- If the underlying DCS Unit does not exist, the method will return nil. .
@@ -796,11 +828,19 @@ function GROUP:GetVelocityVec3()
   return nil
 end
 
+--- Returns the average group altitude in meters.
+-- @param Wrapper.Group#GROUP self
+-- @param #boolean FromGround Measure from the ground or from sea level (ASL). Provide **true** for measuring from the ground (AGL). **false** or **nil** if you measure from sea level. 
+-- @return #number The altitude of the group or nil if is not existing or alive.  
+function GROUP:GetAltitude(FromGround)
+  self:F2( self.GroupName )
+  return self:GetHeight(FromGround)
+end
 
 --- Returns the average group height in meters.
 -- @param Wrapper.Group#GROUP self
--- @param #boolean FromGround Measure from the ground or from sea level. Provide **true** for measuring from the ground. **false** or **nil** if you measure from sea level. 
--- @return DCS#Vec3 The height of the group or nil if is not existing or alive.  
+-- @param #boolean FromGround Measure from the ground or from sea level (ASL). Provide **true** for measuring from the ground (AGL). **false** or **nil** if you measure from sea level. 
+-- @return #number The height of the group or nil if is not existing or alive.  
 function GROUP:GetHeight( FromGround )
   self:F2( self.GroupName )
 
@@ -900,6 +940,24 @@ function GROUP:GetTypeName()
   return nil
 end
 
+--- [AIRPLANE] Get the NATO reporting name (platform, e.g. "Flanker") of a GROUP (note - first unit the group). "Bogey" if not found. Currently airplanes only!
+--@param #GROUP self
+--@return #string NatoReportingName or "Bogey" if unknown.
+function GROUP:GetNatoReportingName()
+  self:F2( self.GroupName )
+  
+  local DCSGroup = self:GetDCSObject()
+  
+  if DCSGroup then
+    local GroupTypeName = DCSGroup:getUnit(1):getTypeName()
+    self:T3( GroupTypeName )
+    return UTILS.GetReportingName(GroupTypeName)
+  end
+  
+  return "Bogey"
+  
+end
+
 --- Gets the player name of the group.
 -- @param #GROUP self
 -- @return #string The player name of the group.
@@ -992,14 +1050,25 @@ end
 -- @param Wrapper.Group#GROUP self
 -- @return Core.Point#COORDINATE The COORDINATE of the GROUP.
 function GROUP:GetCoordinate()
-
-  local FirstUnit = self:GetUnit(1)
+   
+   
+  local Units = self:GetUnits()  or {}
   
-  if FirstUnit then
-    local FirstUnitCoordinate = FirstUnit:GetCoordinate()
-    return FirstUnitCoordinate
+  for _,_unit in pairs(Units) do
+    local FirstUnit = _unit -- Wrapper.Unit#UNIT
+    
+    if FirstUnit then
+    
+      local FirstUnitCoordinate = FirstUnit:GetCoordinate()
+      
+      if FirstUnitCoordinate then
+        local Heading = self:GetHeading()
+        FirstUnitCoordinate.Heading = Heading
+        return FirstUnitCoordinate
+      end
+      
+    end
   end
-  
   BASE:E( { "Cannot GetCoordinate", Group = self, Alive = self:IsAlive() } )
 
   return nil
@@ -1059,7 +1128,7 @@ end
 -- amount of fuel in the group.
 -- @param #GROUP self
 -- @return #number The fuel state of the unit with the least amount of fuel.
--- @return #Unit reference to #Unit object for further processing.
+-- @return Wrapper.Unit#UNIT reference to #Unit object for further processing.
 function GROUP:GetFuelMin()
   self:F3(self.ControllableName)
 

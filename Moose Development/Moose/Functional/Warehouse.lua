@@ -4220,7 +4220,7 @@ function WAREHOUSE:_AssetItemInfo(asset)
   text=text..string.format("Cargo bay max  = %5.2f kg\n", asset.cargobaymax)
   text=text..string.format("Load radius    = %s m\n", tostring(asset.loadradius))
   text=text..string.format("Skill          = %s\n", tostring(asset.skill))
-  text=text..string.format("Livery         = %s", tostring(asset.livery))
+  text=text..string.format("Livery         = %s", tostring(asset.livery))  
   self:I(self.lid..text)
   self:T({DCSdesc=asset.DCSdesc})
   self:T3({Template=asset.template})
@@ -4391,9 +4391,16 @@ function WAREHOUSE:onafterAddRequest(From, Event, To, warehouse, AssetDescriptor
 
   -- Add request to queue.
   table.insert(self.queue, request)
+  
+  local descval="assetlist"
+  if request.assetdesc==WAREHOUSE.Descriptor.ASSETLIST then
+  
+  else
+    descval=tostring(request.assetdescval)
+  end
 
-  local text=string.format("Warehouse %s: New request from warehouse %s.\nDescriptor %s=%s, #assets=%s; Transport=%s, #transports =%s.",
-  self.alias, warehouse.alias, request.assetdesc, tostring(request.assetdescval), tostring(request.nasset), request.transporttype, tostring(request.ntransport))
+  local text=string.format("Warehouse %s: New request from warehouse %s.\nDescriptor %s=%s, #assets=%s; Transport=%s, #transports=%s.",
+  self.alias, warehouse.alias, request.assetdesc, descval, tostring(request.nasset), request.transporttype, tostring(request.ntransport))
   self:_DebugMessage(text, 5)
 
 end
@@ -5961,6 +5968,14 @@ function WAREHOUSE:_SpawnAssetAircraft(alias, asset, request, parking, uncontrol
       _action=COORDINATE.WaypointAction.FromParkingAreaHot
       uncontrolled=false
     end
+    
+    local airstart=asset.takeoffType and asset.takeoffType==COORDINATE.WaypointType.TurningPoint or false
+    
+    if airstart then
+      _type=COORDINATE.WaypointType.TurningPoint
+      _action=COORDINATE.WaypointAction.TurningPoint
+      uncontrolled=false    
+    end
 
 
     -- Set route points.
@@ -5968,7 +5983,15 @@ function WAREHOUSE:_SpawnAssetAircraft(alias, asset, request, parking, uncontrol
 
       -- Get flight path if the group goes to another warehouse by itself.
       if request.toself then
-        local wp=self.airbase:GetCoordinate():WaypointAir("RADIO", _type, _action, 0, false, self.airbase, {}, "Parking")
+      
+        local coord=self.airbase:GetCoordinate()
+        
+        if airstart then
+          coord:SetAltitude(math.random(1000, 2000))
+        end
+        
+        -- Single waypoint.
+        local wp=coord:WaypointAir("RADIO", _type, _action, 0, false, self.airbase, {}, "Parking")
         template.route.points={wp}
       else
         template.route.points=self:_GetFlightplan(asset, self.airbase, request.warehouse.airbase)
@@ -5992,7 +6015,7 @@ function WAREHOUSE:_SpawnAssetAircraft(alias, asset, request, parking, uncontrol
 
     else
 
-      if #parking<#template.units then
+      if #parking<#template.units and not airstart then
         local text=string.format("ERROR: Not enough parking! Free parking = %d < %d aircraft to be spawned.", #parking, #template.units)
         self:_DebugMessage(text)
         return nil
@@ -6014,14 +6037,25 @@ function WAREHOUSE:_SpawnAssetAircraft(alias, asset, request, parking, uncontrol
         unit.x=coord.x
         unit.y=coord.z
         unit.alt=coord.y
+        
+        if airstart then
+          unit.alt=math.random(1000, 2000)
+        end
 
         unit.parking_id = nil
         unit.parking    = nil
 
       else
 
-        local coord=parking[i].Coordinate    --Core.Point#COORDINATE
-        local terminal=parking[i].TerminalID --#number
+        local coord=nil    --Core.Point#COORDINATE
+        local terminal=nil --#number
+        
+        if airstart then
+          coord=self.airbase:GetCoordinate():SetAltitude(math.random(1000, 2000))
+        else
+          coord=parking[i].Coordinate
+          terminal=parking[i].TerminalID
+        end
 
         if self.Debug then
           coord:MarkToAll(string.format("Spawnplace unit %s terminal %d.", unit.name, terminal))

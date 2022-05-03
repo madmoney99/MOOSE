@@ -92,9 +92,15 @@ OPSZONE.version="0.3.0"
 
 --- Create a new OPSZONE class object.
 -- @param #OPSZONE self
--- @param Core.Zone#ZONE Zone The zone.
+-- @param Core.Zone#ZONE Zone The zone. Needs to be a ZONE\_RADIUS (round) zone. Can be passed as ZONE\_AIRBASE or simply as the name of the airbase.
 -- @param #number CoalitionOwner Initial owner of the coaliton. Default `coalition.side.NEUTRAL`.
 -- @return #OPSZONE self
+-- @usage
+--            myopszone = OPSZONE:New(ZONE:FindByName("OpsZoneOne"),coalition.side.RED) -- base zone from the mission editor
+--            myopszone = OPSZONE:New(ZONE_RADIUS:New("OpsZoneTwo",mycoordinate:GetVec2(),5000),coalition.side.BLUE) -- radius zone of 5km at a coordinate
+--            myopszone = OPSZONE:New(ZONE_RADIUS:New("Batumi")) -- airbase zone from Batumi Airbase, ca 2500m radius
+--            myopszone = OPSZONE:New(ZONE_AIRBASE:New("Batumi",6000),coalition.side.BLUE) -- airbase zone from Batumi Airbase, but with a specific radius of 6km
+-- 
 function OPSZONE:New(Zone, CoalitionOwner)
 
   -- Inherit everything from LEGION class.
@@ -426,6 +432,21 @@ end
 function OPSZONE:GetCoordinate()
   local coordinate=self.zone:GetCoordinate()
   return coordinate
+end
+
+--- Returns a random coordinate in the zone.
+-- @param #OPSZONE self
+-- @param #number inner (Optional) Minimal distance from the center of the zone in meters. Default is 0 m.
+-- @param #number outer (Optional) Maximal distance from the outer edge of the zone in meters. Default is the radius of the zone.
+-- @param #table surfacetypes (Optional) Table of surface types. Can also be a single surface type. We will try max 1000 times to find the right type!
+-- @return Core.Point#COORDINATE The random coordinate.
+function OPSZONE:GetRandomCoordinate(inner, outer, surfacetypes)
+
+  local zone=self:GetZone()
+  
+  local coord=zone:GetRandomCoordinate(inner, outer, surfacetypes)
+
+  return coord
 end
 
 --- Get zone name.

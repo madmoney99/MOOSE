@@ -5,13 +5,20 @@
 --    * Manage platoons
 --    * Carry out ARTY and PATROLZONE missions (AUFTRAG)
 --    * Define rearming zones
+-- 
+-- ===
 --
+-- ## Example Missions:
+--
+-- Demo missions can be found on [github](https://github.com/FlightControl-Master/MOOSE_MISSIONS/tree/develop/OPS%20-%20Brigade).
+-- 
 -- ===
 --
 -- ### Author: **funkyfranky**
 -- 
+-- ===
 -- @module Ops.Brigade
--- @image OPS_Brigade.png
+-- @image OPS_Brigade_.png
 
 
 --- BRIGADE class.
@@ -23,13 +30,13 @@
 -- @field Core.Set#SET_ZONE retreatZones Retreat zone set.
 -- @extends Ops.Legion#LEGION
 
---- Be surprised!
+--- *I am not afraid of an Army of lions lead by a sheep; I am afraid of sheep lead by a lion* -- Alexander the Great
 --
 -- ===
 --
 -- # The BRIGADE Concept
 --
--- An BRIGADE consists of one or multiple PLATOONs. These platoons "live" in a WAREHOUSE that has a phyiscal struction (STATIC or UNIT) and can be captured or destroyed.
+-- A BRIGADE consists of one or multiple PLATOONs. These platoons "live" in a WAREHOUSE that has a phyiscal struction (STATIC or UNIT) and can be captured or destroyed.
 --
 --
 -- @field #BRIGADE
@@ -164,8 +171,6 @@ function BRIGADE:AddPlatoon(Platoon)
 
   return self
 end
-
-
 
 --- Add asset group(s) to platoon.
 -- @param #BRIGADE self

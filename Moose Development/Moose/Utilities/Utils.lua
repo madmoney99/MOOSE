@@ -809,7 +809,7 @@ function UTILS.BeaufortScale(speed)
   return bn,bd
 end
 
---- Split string at seperators. C.f. http://stackoverflow.com/questions/1426954/split-string-in-lua
+--- Split string at seperators. C.f. [split-string-in-lua](http://stackoverflow.com/questions/1426954/split-string-in-lua).
 -- @param #string str Sting to split.
 -- @param #string sep Speparator for split.
 -- @return #table Split text.
@@ -1447,6 +1447,23 @@ function UTILS.GetModulationName(Modulation)
 
 end
 
+--- Get the NATO reporting name of a unit type name
+-- @param #number Typename The type name.
+-- @return #string The Reporting name or "Bogey".
+function UTILS.GetReportingName(Typename)
+  
+  local typename = string.lower(Typename)
+  
+  for name, value in pairs(ENUMS.ReportingName.NATO) do
+    local svalue = string.lower(value)
+    if string.find(typename,svalue,1,true) then
+      return name
+    end
+  end
+  
+  return "Bogey"  
+end
+
 --- Get the callsign name from its enumerator value
 -- @param #number Callsign The enumerator callsign.
 -- @return #string The callsign name or "Ghostrider".
@@ -1475,7 +1492,49 @@ function UTILS.GetCallsignName(Callsign)
       return name
     end
   end
-
+  
+  for name, value in pairs(CALLSIGN.B1B) do
+    if value==Callsign then
+      return name
+    end
+  end
+  
+  for name, value in pairs(CALLSIGN.B52) do
+    if value==Callsign then
+      return name
+    end
+  end
+  
+  for name, value in pairs(CALLSIGN.F15E) do
+    if value==Callsign then
+      return name
+    end
+  end
+  
+  for name, value in pairs(CALLSIGN.F16) do
+    if value==Callsign then
+      return name
+    end
+  end
+  
+  for name, value in pairs(CALLSIGN.F18) do
+    if value==Callsign then
+      return name
+    end
+  end
+  
+  for name, value in pairs(CALLSIGN.FARP) do
+    if value==Callsign then
+      return name
+    end
+  end
+  
+  for name, value in pairs(CALLSIGN.TransportAircraft) do
+    if value==Callsign then
+      return name
+    end
+  end
+  
   return "Ghostrider"
 end
 
@@ -1773,7 +1832,7 @@ function UTILS.IsLoadingDoorOpen( unit_name )
           ret_val =  true
       end
       
-      if string.find(type_name, "AH-64D") then
+      if type_name == "AH-64D_BLK_II" then
          BASE:T(unit_name .. " front door(s) are open")
          ret_val =  true -- no doors on this one ;)
       end
@@ -2354,4 +2413,51 @@ function UTILS.LoadStationaryListOfStatics(Path,Filename,Reduce)
     return nil
   end
   return datatable
+end
+
+--- Heading Degrees (0-360) to Cardinal
+-- @param #number Heading The heading
+-- @return #string Cardinal, e.g. "NORTH"
+function UTILS.BearingToCardinal(Heading)
+  if     Heading >= 0   and Heading <= 22  then return "North"
+    elseif Heading >= 23  and Heading <= 66  then return "North-East"
+    elseif Heading >= 67  and Heading <= 101 then return "East"
+    elseif Heading >= 102 and Heading <= 146 then return "South-East"
+    elseif Heading >= 147 and Heading <= 201 then return "South"
+    elseif Heading >= 202 and Heading <= 246 then return "South-West"
+    elseif Heading >= 247 and Heading <= 291 then return "West"
+    elseif Heading >= 292 and Heading <= 338 then return "North-West"
+    elseif Heading >= 339 then return "North"
+  end
+end
+
+--- Create a BRAA NATO call string BRAA between two GROUP objects
+-- @param Wrapper.Group#GROUP FromGrp GROUP object
+-- @param Wrapper.Group#GROUP ToGrp GROUP object
+-- @return #string Formatted BRAA NATO call
+function UTILS.ToStringBRAANATO(FromGrp,ToGrp)
+  local BRAANATO = "Merged."
+  local GroupNumber = FromGrp:GetSize()
+  local GroupWords = "Singleton"
+  if GroupNumber == 2 then GroupWords = "Two-Ship"
+    elseif GroupNumber >= 3 then GroupWords = "Heavy"
+  end
+  local grpLeadUnit = ToGrp:GetUnit(1)
+  local tgtCoord = grpLeadUnit:GetCoordinate()
+  local currentCoord = FromGrp:GetCoordinate()
+  local hdg = UTILS.Round(ToGrp:GetHeading()/100,1)*100
+  local bearing = UTILS.Round(currentCoord:HeadingTo(tgtCoord),0)
+  local rangeMetres = tgtCoord:Get2DDistance(currentCoord)
+  local rangeNM = UTILS.Round( UTILS.MetersToNM(rangeMetres), 0)
+  local aspect = tgtCoord:ToStringAspect(currentCoord)
+  local alt = UTILS.Round(UTILS.MetersToFeet(grpLeadUnit:GetAltitude())/1000,0)--*1000
+  local track = UTILS.BearingToCardinal(hdg)
+  if rangeNM > 3 then
+      if aspect == "" then
+        BRAANATO = string.format("%s, BRA, %03d, %d miles, Angels %d, Track %s",GroupWords,bearing, rangeNM, alt, track)
+      else
+        BRAANATO = string.format("%s, BRAA, %03d, %d miles, Angels %d, %s, Track %s",GroupWords, bearing, rangeNM, alt, aspect, track)      
+      end
+  end
+  return BRAANATO 
 end
