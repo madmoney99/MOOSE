@@ -124,6 +124,7 @@ function DATABASE:New()
   self:HandleEvent( EVENTS.Dead, self._EventOnDeadOrCrash )
   self:HandleEvent( EVENTS.Crash, self._EventOnDeadOrCrash )
   self:HandleEvent( EVENTS.RemoveUnit, self._EventOnDeadOrCrash )
+  --self:HandleEvent( EVENTS.UnitLost, self._EventOnDeadOrCrash )  -- DCS 2.7.1 for Aerial units no dead event ATM
   self:HandleEvent( EVENTS.Hit, self.AccountHits )
   self:HandleEvent( EVENTS.NewCargo )
   self:HandleEvent( EVENTS.DeleteCargo )
@@ -162,17 +163,11 @@ end
 function DATABASE:AddUnit( DCSUnitName )
 
   if not self.UNITS[DCSUnitName] then
-
     -- Debug info.
     self:T( { "Add UNIT:", DCSUnitName } )
 
-    --local UnitRegister = UNIT:Register( DCSUnitName )
-
     -- Register unit
     self.UNITS[DCSUnitName]=UNIT:Register(DCSUnitName)
-
-    -- This is not used anywhere in MOOSE as far as I can see so I remove it until there comes an error somewhere.
-    --table.insert(self.UNITS_Index, DCSUnitName )
   end
 
   return self.UNITS[DCSUnitName]
@@ -182,7 +177,6 @@ end
 --- Deletes a Unit from the DATABASE based on the Unit Name.
 -- @param #DATABASE self
 function DATABASE:DeleteUnit( DCSUnitName )
-
   self.UNITS[DCSUnitName] = nil
 end
 
@@ -1160,6 +1154,22 @@ function DATABASE:_EventOnDeadOrCrash( Event )
 
       if self.STATICS[Event.IniDCSUnitName] then
         self:DeleteStatic( Event.IniDCSUnitName )
+      end
+      
+      ---
+      -- Maybe a UNIT?
+      ---
+      
+      -- Delete unit.
+      if self.UNITS[Event.IniDCSUnitName] then
+        self:T("STATIC Event for UNIT "..tostring(Event.IniDCSUnitName))
+        local DCSUnit = _DATABASE:FindUnit( Event.IniDCSUnitName )
+        self:T({DCSUnit})
+        if DCSUnit then
+          --self:I("Creating DEAD Event for UNIT "..tostring(Event.IniDCSUnitName))
+          --DCSUnit:Destroy(true)
+          return
+        end
       end
 
     else

@@ -176,6 +176,7 @@ end
 -- @param DCS#Vec3 Vec3 The point to test.
 -- @return #boolean true if the Vec3 is within the zone.
 function ZONE_BASE:IsVec3InZone( Vec3 )
+  if not Vec3 then return false end
   local InZone = self:IsVec2InZone( { x = Vec3.x, y = Vec3.z } )
   return InZone
 end
@@ -1165,7 +1166,9 @@ end
 -- @return #boolean true if the location is within the zone.
 function ZONE_RADIUS:IsVec2InZone( Vec2 )
   self:F2( Vec2 )
-
+  
+  if not Vec2 then return false end 
+  
   local ZoneVec2 = self:GetVec2()
 
   if ZoneVec2 then
@@ -1183,7 +1186,7 @@ end
 -- @return #boolean true if the point is within the zone.
 function ZONE_RADIUS:IsVec3InZone( Vec3 )
   self:F2( Vec3 )
-
+  if not Vec3 then return false end  
   local InZone = self:IsVec2InZone( { x = Vec3.x, y = Vec3.z } )
 
   return InZone
@@ -1974,7 +1977,7 @@ end
 -- @return #boolean true if the location is within the zone.
 function ZONE_POLYGON_BASE:IsVec2InZone( Vec2 )
   self:F2( Vec2 )
-
+  if not Vec2 then return false end 
   local Next
   local Prev
   local InPolygon = false
@@ -2004,7 +2007,9 @@ end
 -- @return #boolean true if the point is within the zone.
 function ZONE_POLYGON_BASE:IsVec3InZone( Vec3 )
   self:F2( Vec3 )
-
+  
+  if not Vec3 then return false end 
+    
   local InZone = self:IsVec2InZone( { x = Vec3.x, y = Vec3.z } )
 
   return InZone
