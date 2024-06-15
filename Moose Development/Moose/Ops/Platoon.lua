@@ -56,7 +56,7 @@ PLATOON.version="0.1.0"
 -- @param #PLATOON self
 -- @param #string TemplateGroupName Name of the template group.
 -- @param #number Ngroups Number of asset groups of this platoon. Default 3.
--- @param #string PlatoonName Name of the platoon, e.g. "VFA-37".
+-- @param #string PlatoonName Name of the platoon. Must be **unique**!
 -- @return #PLATOON self
 function PLATOON:New(TemplateGroupName, Ngroups, PlatoonName)
 
@@ -65,6 +65,9 @@ function PLATOON:New(TemplateGroupName, Ngroups, PlatoonName)
   
   -- All platoons get mission type Nothing.
   self:AddMissionCapability(AUFTRAG.Type.NOTHING, 50)
+  
+  -- Is ground.
+  self.isGround=true
 
   -- Get ammo.
   self.ammo=self:_CheckAmmo()
@@ -97,6 +100,7 @@ end
 -- Start & Status
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+--[[
 --- On after Start event. Starts the FLIGHTGROUP FSM and event handlers.
 -- @param #PLATOON self
 -- @param #string From From state.
@@ -111,6 +115,7 @@ function PLATOON:onafterStart(From, Event, To)
   -- Start the status monitoring.
   self:__Status(-1)
 end
+]]
 
 --- On after "Status" event.
 -- @param #PLATOON self

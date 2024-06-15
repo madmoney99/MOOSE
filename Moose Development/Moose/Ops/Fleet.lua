@@ -9,7 +9,7 @@
 --
 -- ## Example Missions:
 --
--- Demo missions can be found on [github](https://github.com/FlightControl-Master/MOOSE_MISSIONS/tree/develop/OPS%20-%20Fleet).
+-- Demo missions can be found on [github](https://github.com/FlightControl-Master/MOOSE_MISSIONS/tree/develop/Ops/Fleet).
 -- 
 -- ===
 --
@@ -108,6 +108,15 @@ function FLEET:New(WarehouseName, FleetName)
   
   -- Defaults
   self:SetRetreatZones()
+  
+  -- Turn ship into NAVYGROUP.
+  if self:IsShip() then
+    local wh=self.warehouse --Wrapper.Unit#UNIT
+    local group=wh:GetGroup()
+    self.warehouseOpsGroup=NAVYGROUP:New(group) --Ops.NavyGroup#NAVYGROUP
+    self.warehouseOpsElement=self.warehouseOpsGroup:GetElementByName(wh:GetName())
+  end
+
 
   -- Add FSM transitions.
   --                 From State  -->   Event         -->      To State

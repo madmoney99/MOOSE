@@ -1,4 +1,4 @@
---- **Tasking** -- A command center governs multiple missions, and takes care of the reporting and communications.
+--- **Tasking** - A command center governs multiple missions, and takes care of the reporting and communications.
 -- 
 -- **Features:**
 -- 
@@ -162,7 +162,12 @@
 -- choose from 2 added menu options either to accept or reject the assigned task within 30 seconds.
 -- If the task is not accepted within 30 seconds; the task will be cancelled and a new task will be assigned.
 -- 
+--
+-- # Developer Note
 -- 
+-- Note while this class still works, it is no longer supported as the original author stopped active development of MOOSE
+-- Therefore, this class is considered to be deprecated
+--
 -- @field #COMMANDCENTER
 COMMANDCENTER = {
   ClassName = "COMMANDCENTER",
@@ -334,7 +339,7 @@ end
 
 --- Gets the coalition of the command center.
 -- @param #COMMANDCENTER self
--- @return DCScoalition#coalition
+-- @return #number Coalition of the command center.
 function COMMANDCENTER:GetCoalition()
 
   return self.CommandCenterCoalition
@@ -512,7 +517,7 @@ function COMMANDCENTER:AssignTask( TaskGroup )
   
   if Task then
 
-    self:I( "Assigning task " .. Task:GetName() .. " using auto assign method " .. self.AutoAssignMethod .. " to " .. TaskGroup:GetName() .. " with task priority " .. AssignPriority )
+    self:T( "Assigning task " .. Task:GetName() .. " using auto assign method " .. self.AutoAssignMethod .. " to " .. TaskGroup:GetName() .. " with task priority " .. AssignPriority )
     
     if not self.AutoAcceptTasks == true then
       Task:SetAutoAssignMethod( ACT_ASSIGN_MENU_ACCEPT:New( Task.TaskBriefing ) )

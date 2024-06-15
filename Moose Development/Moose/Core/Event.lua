@@ -14,7 +14,7 @@
 -- ![Objects](..\Presentations\EVENT\Dia2.JPG)
 --
 -- Within a running mission, various DCS events occur. Units are dynamically created, crash, die, shoot stuff, get hit etc.
--- This module provides a mechanism to dispatch those events occuring within your running mission, to the different objects orchestrating your mission.
+-- This module provides a mechanism to dispatch those events occurring within your running mission, to the different objects orchestrating your mission.
 --
 -- ![Objects](..\Presentations\EVENT\Dia3.JPG)
 --
@@ -32,11 +32,11 @@
 --
 -- ![Objects](..\Presentations\EVENT\Dia5.JPG)
 --
--- There are 5 levels of kind of objects that the _EVENTDISPATCHER services:
+-- There are 5 types/levels of objects that the _EVENTDISPATCHER services:
 --
 --  * _DATABASE object: The core of the MOOSE objects. Any object that is created, deleted or updated, is done in this database.
---  * SET_ derived classes: Subsets of the _DATABASE object. These subsets are updated by the _EVENTDISPATCHER as the second priority.
---  * UNIT objects: UNIT objects can subscribe to DCS events. Each DCS event will be directly published to teh subscribed UNIT object.
+--  * SET_ derived classes: These are subsets of the global _DATABASE object (an instance of @{Core.Database#DATABASE}). These subsets are updated by the _EVENTDISPATCHER as the second priority.
+--  * UNIT objects: UNIT objects can subscribe to DCS events. Each DCS event will be directly published to the subscribed UNIT object.
 --  * GROUP objects: GROUP objects can subscribe to DCS events. Each DCS event will be directly published to the subscribed GROUP object.
 --  * Any other object: Various other objects can subscribe to DCS events. Each DCS event triggered will be published to each subscribed object.
 --
@@ -52,7 +52,7 @@
 --
 -- ![Objects](..\Presentations\EVENT\Dia8.JPG)
 --
--- The actual event subscribing and handling is not facilitated through the _EVENTDISPATCHER, but it is done through the @{BASE} class, @{UNIT} class and @{GROUP} class.
+-- The actual event subscribing and handling is not facilitated through the _EVENTDISPATCHER, but it is done through the @{Core.Base#BASE} class, @{Wrapper.Unit#UNIT} class and @{Wrapper.Group#GROUP} class.
 -- The _EVENTDISPATCHER is a component that is quietly working in the background of MOOSE.
 --
 -- ![Objects](..\Presentations\EVENT\Dia9.JPG)
@@ -173,7 +173,8 @@
 -- @image Core_Event.JPG
 
 
---- @type EVENT
+---
+-- @type EVENT
 -- @field #EVENT.Events Events
 -- @extends Core.Base#BASE
 
@@ -248,6 +249,27 @@ EVENTS = {
   TriggerZone               = world.event.S_EVENT_TRIGGER_ZONE or -1,
   LandingQualityMark        = world.event.S_EVENT_LANDING_QUALITY_MARK or -1,
   BDA                       = world.event.S_EVENT_BDA or -1,
+  -- Added with DCS 2.8.0
+  AIAbortMission            = world.event.S_EVENT_AI_ABORT_MISSION or -1,
+  DayNight                  = world.event.S_EVENT_DAYNIGHT or -1,
+  FlightTime                = world.event.S_EVENT_FLIGHT_TIME or -1,
+  SelfKillPilot             = world.event.S_EVENT_PLAYER_SELF_KILL_PILOT or -1,
+  PlayerCaptureAirfield     = world.event.S_EVENT_PLAYER_CAPTURE_AIRFIELD or -1, 
+  EmergencyLanding          = world.event.S_EVENT_EMERGENCY_LANDING or -1,
+  UnitCreateTask            = world.event.S_EVENT_UNIT_CREATE_TASK or -1,
+  UnitDeleteTask            = world.event.S_EVENT_UNIT_DELETE_TASK or -1,
+  SimulationStart           = world.event.S_EVENT_SIMULATION_START or -1,
+  WeaponRearm               = world.event.S_EVENT_WEAPON_REARM or -1,
+  WeaponDrop                = world.event.S_EVENT_WEAPON_DROP or -1,
+  -- Added with DCS 2.9.0
+  UnitTaskTimeout           = world.event.S_EVENT_UNIT_TASK_TIMEOUT or -1,
+  UnitTaskStage             = world.event.S_EVENT_UNIT_TASK_STAGE or -1,
+  MacSubtaskScore           = world.event.S_EVENT_MAC_SUBTASK_SCORE or -1, 
+  MacExtraScore             = world.event.S_EVENT_MAC_EXTRA_SCORE or -1,
+  MissionRestart            = world.event.S_EVENT_MISSION_RESTART or -1,
+  MissionWinner             = world.event.S_EVENT_MISSION_WINNER or -1, 
+  PostponedTakeoff          = world.event.S_EVENT_POSTPONED_TAKEOFF or -1, 
+  PostponedLand             = world.event.S_EVENT_POSTPONED_LAND or -1, 
 }
 
 --- The Event structure
@@ -270,6 +292,7 @@ EVENTS = {
 -- @field Wrapper.Group#GROUP IniGroup (UNIT) The initiating MOOSE wrapper @{Wrapper.Group#GROUP} of the initiator Group object.
 -- @field #string IniGroupName UNIT) The initiating GROUP name (same as IniDCSGroupName).
 -- @field #string IniPlayerName (UNIT) The name of the initiating player in case the Unit is a client or player slot.
+-- @field #string IniPlayerUCID (UNIT) The UCID of the initiating player in case the Unit is a client or player slot and on a multi-player server.
 -- @field DCS#coalition.side IniCoalition (UNIT) The coalition of the initiator.
 -- @field DCS#Unit.Category IniCategory (UNIT) The category of the initiator.
 -- @field #string IniTypeName (UNIT) The type name of the initiator.
@@ -285,6 +308,7 @@ EVENTS = {
 -- @field Wrapper.Group#GROUP TgtGroup (UNIT) The target MOOSE wrapper @{Wrapper.Group#GROUP} of the target Group object.
 -- @field #string TgtGroupName (UNIT) The target GROUP name (same as TgtDCSGroupName).
 -- @field #string TgtPlayerName (UNIT) The name of the target player in case the Unit is a client or player slot.
+-- @field #string TgtPlayerUCID (UNIT) The UCID of the target player in case the Unit is a client or player slot and on a multi-player server.
 -- @field DCS#coalition.side TgtCoalition (UNIT) The coalition of the target.
 -- @field DCS#Unit.Category TgtCategory (UNIT) The category of the target.
 -- @field #string TgtTypeName (UNIT) The type name of the target.
@@ -293,15 +317,15 @@ EVENTS = {
 -- @field Wrapper.Airbase#AIRBASE Place The MOOSE airbase object.
 -- @field #string PlaceName The name of the airbase.
 --
--- @field #table weapon The weapon used during the event.
--- @field #table Weapon
+-- @field DCS#Weapon weapon The weapon used during the event.
+-- @field DCS#Weapon Weapon The weapon used during the event.
 -- @field #string WeaponName Name of the weapon.
 -- @field DCS#Unit WeaponTgtDCSUnit Target DCS unit of the weapon.
 --
 -- @field Cargo.Cargo#CARGO Cargo The cargo object.
 -- @field #string CargoName The name of the cargo object.
 --
--- @field Core.ZONE#ZONE Zone The zone object.
+-- @field Core.Zone#ZONE Zone The zone object.
 -- @field #string ZoneName The name of the zone.
 
 
@@ -560,8 +584,117 @@ local _EVENTMETA = {
      Event = "OnEventBDA",
      Text = "S_EVENT_BDA"
    },
+   -- Added with DCS 2.8
+   [EVENTS.AIAbortMission] = {
+     Order = 1,
+     Side = "I",
+     Event = "OnEventAIAbortMission",
+     Text = "S_EVENT_AI_ABORT_MISSION"
+   },
+   [EVENTS.DayNight] = {
+     Order = 1,
+     Event = "OnEventDayNight",
+     Text = "S_EVENT_DAYNIGHT"
+   },
+   [EVENTS.FlightTime] = {
+     Order = 1,
+     Event = "OnEventFlightTime",
+     Text = "S_EVENT_FLIGHT_TIME"
+   },
+   [EVENTS.SelfKillPilot] = {
+     Order = 1,
+     Side = "I",
+     Event = "OnEventSelfKillPilot",
+     Text = "S_EVENT_PLAYER_SELF_KILL_PILOT"
+   },
+   [EVENTS.PlayerCaptureAirfield] = {
+     Order = 1,
+     Event = "OnEventPlayerCaptureAirfield",
+     Text = "S_EVENT_PLAYER_CAPTURE_AIRFIELD"
+   },
+   [EVENTS.EmergencyLanding] = {
+     Order = 1,
+     Side = "I",
+     Event = "OnEventEmergencyLanding",
+     Text = "S_EVENT_EMERGENCY_LANDING"
+   },
+   [EVENTS.UnitCreateTask] = {
+     Order = 1,
+     Event = "OnEventUnitCreateTask",
+     Text = "S_EVENT_UNIT_CREATE_TASK"
+   },
+   [EVENTS.UnitDeleteTask] = {
+     Order = 1,
+     Event = "OnEventUnitDeleteTask",
+     Text = "S_EVENT_UNIT_DELETE_TASK"
+   },
+   [EVENTS.SimulationStart] = {
+     Order = 1,
+     Event = "OnEventSimulationStart",
+     Text = "S_EVENT_SIMULATION_START"
+   },
+   [EVENTS.WeaponRearm] = {
+     Order = 1,
+     Side = "I",
+     Event = "OnEventWeaponRearm",
+     Text = "S_EVENT_WEAPON_REARM"
+   },
+   [EVENTS.WeaponDrop] = {
+     Order = 1,
+     Side = "I",
+     Event = "OnEventWeaponDrop",
+     Text = "S_EVENT_WEAPON_DROP"
+   },
+   -- DCS 2.9
+  [EVENTS.UnitTaskTimeout] = {
+     Order = 1,
+     Side = "I",
+     Event = "OnEventUnitTaskTimeout",
+     Text = "S_EVENT_UNIT_TASK_TIMEOUT "
+   },
+  [EVENTS.UnitTaskStage] = {
+     Order = 1,
+     Side = "I",
+     Event = "OnEventUnitTaskStage",
+     Text = "S_EVENT_UNIT_TASK_STAGE "
+   },
+  [EVENTS.MacSubtaskScore] = {
+     Order = 1,
+     Side = "I",
+     Event = "OnEventMacSubtaskScore",
+     Text = "S_EVENT_MAC_SUBTASK_SCORE"
+   },
+  [EVENTS.MacExtraScore] = {
+     Order = 1,
+     Side = "I",
+     Event = "OnEventMacExtraScore",
+     Text = "S_EVENT_MAC_EXTRA_SCOREP"
+   },
+  [EVENTS.MissionRestart] = {
+     Order = 1,
+     Side = "I",
+     Event = "OnEventMissionRestart",
+     Text = "S_EVENT_MISSION_RESTART"
+   },
+  [EVENTS.MissionWinner] = {
+     Order = 1,
+     Side = "I",
+     Event = "OnEventMissionWinner",
+     Text = "S_EVENT_MISSION_WINNER"
+   },
+  [EVENTS.PostponedTakeoff] = {
+     Order = 1,
+     Side = "I",
+     Event = "OnEventPostponedTakeoff",
+     Text = "S_EVENT_POSTPONED_TAKEOFF"
+   },
+  [EVENTS.PostponedLand] = {
+     Order = 1,
+     Side = "I",
+     Event = "OnEventPostponedLand",
+     Text = "S_EVENT_POSTPONED_LAND"
+   }, 
 }
-
 
 --- The Events structure
 -- @type EVENT.Events
@@ -916,7 +1049,7 @@ do -- Event Creation
 
   --- Creation of a New ZoneGoal Event.
   -- @param #EVENT self
-  -- @param Core.Functional#ZONE_GOAL ZoneGoal The ZoneGoal created.
+  -- @param Functional.ZoneGoal#ZONE_GOAL ZoneGoal The ZoneGoal created.
   function EVENT:CreateEventNewZoneGoal( ZoneGoal )
     self:F( { ZoneGoal } )
 
@@ -932,7 +1065,7 @@ do -- Event Creation
 
   --- Creation of a ZoneGoal Deletion Event.
   -- @param #EVENT self
-  -- @param Core.ZoneGoal#ZONE_GOAL ZoneGoal The ZoneGoal created.
+  -- @param Functional.ZoneGoal#ZONE_GOAL ZoneGoal The ZoneGoal created.
   function EVENT:CreateEventDeleteZoneGoal( ZoneGoal )
     self:F( { ZoneGoal } )
 
@@ -1008,9 +1141,9 @@ function EVENT:onEvent( Event )
 
       if Event.initiator then
 
-        Event.IniObjectCategory = Event.initiator:getCategory()
+        Event.IniObjectCategory = Object.getCategory(Event.initiator)
         
-       if Event.IniObjectCategory == Object.Category.STATIC then
+        if Event.IniObjectCategory == Object.Category.STATIC then
           ---
           -- Static
           ---          
@@ -1046,10 +1179,9 @@ function EVENT:onEvent( Event )
           local Unit=UNIT:FindByName(Event.IniDCSUnitName)
           if Unit then
             Event.IniObjectCategory = Object.Category.UNIT
-          end
-        end        
+          end       
 
-        if Event.IniObjectCategory == Object.Category.UNIT then
+        elseif Event.IniObjectCategory == Object.Category.UNIT then
           ---
           -- Unit
           ---        
@@ -1058,7 +1190,7 @@ function EVENT:onEvent( Event )
           Event.IniUnitName = Event.IniDCSUnitName
           Event.IniDCSGroup = Event.IniDCSUnit:getGroup()
           Event.IniUnit = UNIT:FindByName( Event.IniDCSUnitName )
-          
+                  
           if not Event.IniUnit then
             -- Unit can be a CLIENT. Most likely this will be the case ...
             Event.IniUnit = CLIENT:FindByName( Event.IniDCSUnitName, '', true )
@@ -1072,12 +1204,19 @@ function EVENT:onEvent( Event )
           end
           
           Event.IniPlayerName = Event.IniDCSUnit:getPlayerName()
+          if Event.IniPlayerName then
+            -- get UUCID
+            local PID = NET.GetPlayerIDByName(nil,Event.IniPlayerName)
+            if PID then
+              Event.IniPlayerUCID = net.get_player_info(tonumber(PID), 'ucid')
+              --env.info("Event.IniPlayerUCID="..tostring(Event.IniPlayerUCID),false)
+            end
+          end
           Event.IniCoalition = Event.IniDCSUnit:getCoalition()
           Event.IniTypeName = Event.IniDCSUnit:getTypeName()
           Event.IniCategory = Event.IniDCSUnit:getDesc().category  
-        end
 
-        if Event.IniObjectCategory == Object.Category.CARGO then
+        elseif Event.IniObjectCategory == Object.Category.CARGO then
           ---
           -- Cargo
           ---
@@ -1088,22 +1227,19 @@ function EVENT:onEvent( Event )
           Event.IniCoalition = Event.IniDCSUnit:getCoalition()
           Event.IniCategory = Event.IniDCSUnit:getDesc().category
           Event.IniTypeName = Event.IniDCSUnit:getTypeName()
-        end
 
-        if Event.IniObjectCategory == Object.Category.SCENERY then
+        elseif Event.IniObjectCategory == Object.Category.SCENERY then
           ---
           -- Scenery
-          ---
-          
+          ---          
           Event.IniDCSUnit = Event.initiator
           Event.IniDCSUnitName = Event.IniDCSUnit:getName()
           Event.IniUnitName = Event.IniDCSUnitName
           Event.IniUnit = SCENERY:Register( Event.IniDCSUnitName, Event.initiator )
           Event.IniCategory = Event.IniDCSUnit:getDesc().category
           Event.IniTypeName = Event.initiator:isExist() and Event.IniDCSUnit:getTypeName() or "SCENERY"
-        end
 
-        if Event.IniObjectCategory == Object.Category.BASE then
+        elseif Event.IniObjectCategory == Object.Category.BASE then
           ---
           -- Base Object
           ---
@@ -1114,6 +1250,12 @@ function EVENT:onEvent( Event )
           Event.IniCoalition = Event.IniDCSUnit:getCoalition()
           Event.IniCategory = Event.IniDCSUnit:getDesc().category
           Event.IniTypeName = Event.IniDCSUnit:getTypeName()
+          
+          -- If the airbase does not exist in the DB, we add it (e.g. when FARPS are spawned).
+          if not Event.IniUnit then
+            _DATABASE:_RegisterAirbase(Event.initiator)
+            Event.IniUnit = AIRBASE:FindByName(Event.IniDCSUnitName)
+          end
         end
       end
 
@@ -1124,9 +1266,12 @@ function EVENT:onEvent( Event )
         ---
 
         -- Target category.
-        Event.TgtObjectCategory = Event.target:getCategory()
+        Event.TgtObjectCategory = Object.getCategory(Event.target)
 
         if Event.TgtObjectCategory == Object.Category.UNIT then
+          ---
+          -- UNIT
+          ---
           Event.TgtDCSUnit = Event.target
           Event.TgtDCSGroup = Event.TgtDCSUnit:getGroup()
           Event.TgtDCSUnitName = Event.TgtDCSUnit:getName()
@@ -1139,21 +1284,33 @@ function EVENT:onEvent( Event )
             Event.TgtGroupName = Event.TgtDCSGroupName
           end
           Event.TgtPlayerName = Event.TgtDCSUnit:getPlayerName()
+          if Event.TgtPlayerName  then
+            -- get UUCID
+            local PID = NET.GetPlayerIDByName(nil,Event.TgtPlayerName)
+            if PID then
+              Event.TgtPlayerUCID = net.get_player_info(tonumber(PID), 'ucid')
+              --env.info("Event.TgtPlayerUCID="..tostring(Event.TgtPlayerUCID),false)
+            end
+          end
           Event.TgtCoalition = Event.TgtDCSUnit:getCoalition()
           Event.TgtCategory = Event.TgtDCSUnit:getDesc().category
           Event.TgtTypeName = Event.TgtDCSUnit:getTypeName()
-        end
 
-        if Event.TgtObjectCategory == Object.Category.STATIC then
-          -- get base data
+        elseif Event.TgtObjectCategory == Object.Category.STATIC then
+          ---
+          -- STATIC
+          ---
           Event.TgtDCSUnit = Event.target
-          if Event.target:isExist() and Event.id ~= 33 then -- leave out ejected seat object
+          if Event.target.isExist and Event.target:isExist() and Event.id ~= 33 then -- leave out ejected seat object, check that isExist exists (Kiowa Hellfire issue, Special K)
             Event.TgtDCSUnitName = Event.TgtDCSUnit:getName()
-            Event.TgtUnitName = Event.TgtDCSUnitName
-            Event.TgtUnit = STATIC:FindByName( Event.TgtDCSUnitName, false )
-            Event.TgtCoalition = Event.TgtDCSUnit:getCoalition()
-            Event.TgtCategory = Event.TgtDCSUnit:getDesc().category
-            Event.TgtTypeName = Event.TgtDCSUnit:getTypeName()
+            -- Workaround for borked target info on cruise missiles
+            if Event.TgtDCSUnitName and Event.TgtDCSUnitName ~= "" then
+              Event.TgtUnitName = Event.TgtDCSUnitName
+              Event.TgtUnit = STATIC:FindByName( Event.TgtDCSUnitName, false )
+              Event.TgtCoalition = Event.TgtDCSUnit:getCoalition()
+              Event.TgtCategory = Event.TgtDCSUnit:getDesc().category
+              Event.TgtTypeName = Event.TgtDCSUnit:getTypeName()
+            end
           else
             Event.TgtDCSUnitName = string.format("No target object for Event ID %s", tostring(Event.id))
             Event.TgtUnitName = Event.TgtDCSUnitName
@@ -1172,9 +1329,11 @@ function EVENT:onEvent( Event )
               Event.TgtTypeName = "Static"
             end
           end
-        end
 
-        if Event.TgtObjectCategory == Object.Category.SCENERY then
+        elseif Event.TgtObjectCategory == Object.Category.SCENERY then
+          ---
+          -- SCENERY
+          ---
           Event.TgtDCSUnit = Event.target
           Event.TgtDCSUnitName = Event.TgtDCSUnit:getName()
           Event.TgtUnitName = Event.TgtDCSUnitName
@@ -1189,7 +1348,8 @@ function EVENT:onEvent( Event )
         Event.Weapon = Event.weapon
         Event.WeaponName = Event.Weapon:getTypeName()
         Event.WeaponUNIT = CLIENT:Find( Event.Weapon, '', true ) -- Sometimes, the weapon is a player unit!
-        Event.WeaponPlayerName = Event.WeaponUNIT and Event.Weapon:getPlayerName()
+        Event.WeaponPlayerName = Event.WeaponUNIT and Event.Weapon.getPlayerName and Event.Weapon:getPlayerName()
+        --Event.WeaponPlayerName = Event.WeaponUNIT and Event.Weapon:getPlayerName()
         Event.WeaponCoalition = Event.WeaponUNIT and Event.Weapon:getCoalition()
         Event.WeaponCategory = Event.WeaponUNIT and Event.Weapon:getDesc().category
         Event.WeaponTypeName = Event.WeaponUNIT and Event.Weapon:getTypeName()
@@ -1203,9 +1363,11 @@ function EVENT:onEvent( Event )
           --local name=Event.place:getName()  -- This returns a DCS error "Airbase doesn't exit" :(
           -- However, this is not a big thing, as the aircraft the pilot ejected from is usually long crashed before the ejected pilot touches the ground.
           --Event.Place=UNIT:Find(Event.place)
-        else
-          Event.Place=AIRBASE:Find(Event.place)
-          Event.PlaceName=Event.Place:GetName()
+        else  
+          if Event.place:isExist() and Object.getCategory(Event.place) ~= Object.Category.SCENERY then
+            Event.Place=AIRBASE:Find(Event.place)
+            Event.PlaceName=Event.Place:GetName()
+          end
         end
       end
 
@@ -1216,6 +1378,7 @@ function EVENT:onEvent( Event )
         Event.MarkCoordinate=COORDINATE:NewFromVec3(Event.pos)
         Event.MarkText=Event.text
         Event.MarkCoalition=Event.coalition
+        Event.IniCoalition=Event.coalition
         Event.MarkGroupID = Event.groupID
       end
 

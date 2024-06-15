@@ -57,7 +57,7 @@ FLOTILLA.version="0.1.0"
 -- @param #FLOTILLA self
 -- @param #string TemplateGroupName Name of the template group.
 -- @param #number Ngroups Number of asset groups of this flotilla. Default 3.
--- @param #string FlotillaName Name of the flotilla, e.g. "VFA-37".
+-- @param #string FlotillaName Name of the flotilla. Must be **unique**!
 -- @return #FLOTILLA self
 function FLOTILLA:New(TemplateGroupName, Ngroups, FlotillaName)
 
@@ -65,7 +65,10 @@ function FLOTILLA:New(TemplateGroupName, Ngroups, FlotillaName)
   local self=BASE:Inherit(self, COHORT:New(TemplateGroupName, Ngroups, FlotillaName)) -- #FLOTILLA
   
   -- All flotillas get mission type Nothing.
-  self:AddMissionCapability(AUFTRAG.Type.NOTHING, 50)  
+  self:AddMissionCapability(AUFTRAG.Type.NOTHING, 50)
+  
+  -- Is naval.
+  self.isNaval=true
 
   -- Get initial ammo.
   self.ammo=self:_CheckAmmo()

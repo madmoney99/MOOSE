@@ -93,7 +93,7 @@ SQUADRON.version="0.8.1"
 -- @param #SQUADRON self
 -- @param #string TemplateGroupName Name of the template group.
 -- @param #number Ngroups Number of asset groups of this squadron. Default 3.
--- @param #string SquadronName Name of the squadron, e.g. "VFA-37".
+-- @param #string SquadronName Name of the squadron, e.g. "VFA-37". Must be **unique**!
 -- @return #SQUADRON self
 function SQUADRON:New(TemplateGroupName, Ngroups, SquadronName)
 
@@ -102,6 +102,9 @@ function SQUADRON:New(TemplateGroupName, Ngroups, SquadronName)
 
   -- Everyone can ORBIT.
   self:AddMissionCapability(AUFTRAG.Type.ORBIT)
+  
+  -- Is air.
+  self.isAir=true
 
   -- Refueling system.
   self.refuelSystem=select(2, self.templategroup:GetUnit(1):IsRefuelable())
@@ -240,7 +243,7 @@ end
 
 --- Set airwing.
 -- @param #SQUADRON self
--- @param Ops.AirWing#AIRWING Airwing The airwing.
+-- @param Ops.Airwing#AIRWING Airwing The airwing.
 -- @return #SQUADRON self
 function SQUADRON:SetAirwing(Airwing)
   self.legion=Airwing
@@ -249,7 +252,7 @@ end
 
 --- Get airwing.
 -- @param #SQUADRON self
--- @return Ops.AirWing#AIRWING The airwing.
+-- @return Ops.Airwing#AIRWING The airwing.
 function SQUADRON:GetAirwing(Airwing)
   return self.legion
 end

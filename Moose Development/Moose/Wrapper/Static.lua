@@ -1,4 +1,4 @@
---- **Wrapper** -- STATIC wraps the DCS StaticObject class.
+--- **Wrapper** - STATIC wraps the DCS StaticObject class.
 -- 
 -- ===
 -- 
@@ -12,7 +12,8 @@
 -- @image Wrapper_Static.JPG
 
 
---- @type STATIC
+---
+-- @type STATIC
 -- @extends Wrapper.Positionable#POSITIONABLE
 
 --- Wrapper class to handle Static objects.
@@ -26,25 +27,25 @@
 -- 
 -- ## STATIC reference methods
 -- 
--- For each DCS Static will have a STATIC wrapper object (instance) within the _@{DATABASE} object.
+-- For each DCS Static will have a STATIC wrapper object (instance) within the global _DATABASE object (an instance of @{Core.Database#DATABASE}).
 -- This is done at the beginning of the mission (when the mission starts).
 --  
--- The STATIC class does not contain a :New() method, rather it provides :Find() methods to retrieve the object reference
+-- The @{#STATIC} class does not contain a :New() method, rather it provides :Find() methods to retrieve the object reference
 -- using the Static Name.
 -- 
 -- Another thing to know is that STATIC objects do not "contain" the DCS Static object. 
--- The STATIc methods will reference the DCS Static object by name when it is needed during API execution.
+-- The @{#STATIC} methods will reference the DCS Static object by name when it is needed during API execution.
 -- If the DCS Static object does not exist or is nil, the STATIC methods will return nil and log an exception in the DCS.log file.
 --  
--- The STATIc class provides the following functions to retrieve quickly the relevant STATIC instance:
+-- The @{#STATIC} class provides the following functions to retrieve quickly the relevant STATIC instance:
 -- 
---  * @{#STATIC.FindByName}(): Find a STATIC instance from the _DATABASE object using a DCS Static name.
+--  * @{#STATIC.FindByName}(): Find a STATIC instance from the global _DATABASE object (an instance of @{Core.Database#DATABASE}) using a DCS Static name.
 --  
--- IMPORTANT: ONE SHOULD NEVER SANATIZE these STATIC OBJECT REFERENCES! (make the STATIC object references nil).
+-- IMPORTANT: ONE SHOULD NEVER SANITIZE these STATIC OBJECT REFERENCES! (make the STATIC object references nil).
 -- 
 -- @field #STATIC
 STATIC = {
-	ClassName = "STATIC",
+  ClassName = "STATIC",
 }
 
 
@@ -55,9 +56,33 @@ STATIC = {
 function STATIC:Register( StaticName )
   local self = BASE:Inherit( self, POSITIONABLE:New( StaticName ) )
   self.StaticName = StaticName
+  
+  local DCSStatic = StaticObject.getByName( self.StaticName )
+  if DCSStatic then
+    local Life0 = DCSStatic:getLife() or 1
+    self.Life0 = Life0
+  end
+  
   return self
 end
 
+--- Get initial life points
+-- @param #STATIC self
+-- @return #number lifepoints
+function STATIC:GetLife0()
+  return self.Life0 or 1
+end
+
+--- Get current life points
+-- @param #STATIC self
+-- @return #number lifepoints or nil
+function STATIC:GetLife()
+  local DCSStatic = StaticObject.getByName( self.StaticName )
+  if DCSStatic then
+    return DCSStatic:getLife() or 1
+  end
+  return nil
+end
 
 --- Finds a STATIC from the _DATABASE using a DCSStatic object.
 -- @param #STATIC self
@@ -85,7 +110,7 @@ function STATIC:FindByName( StaticName, RaiseError )
   self.StaticName = StaticName
   
   if StaticFound then
-  	return StaticFound
+    return StaticFound
   end
   
   if RaiseError == nil or RaiseError == true then 
@@ -162,9 +187,9 @@ function STATIC:GetDCSObject()
   return nil
 end
 
---- Returns a list of one @{Static}.
+--- Returns a list of one @{Wrapper.Static}.
 -- @param #STATIC self
--- @return #list<Wrapper.Static#STATIC> A list of one @{Static}.
+-- @return #list<Wrapper.Static#STATIC> A list of one @{Wrapper.Static}.
 function STATIC:GetUnits()
   self:F2( { self.StaticName } )
   local DCSStatic = self:GetDCSObject()
@@ -212,7 +237,7 @@ function STATIC:SpawnAt(Coordinate, Heading, Delay)
 end
 
 
---- Respawn the @{Wrapper.Unit} at the same location with the same properties.
+--- Respawn the @{Wrapper.Static} at the same location with the same properties.
 -- This is useful to respawn a cargo after it has been destroyed.
 -- @param #STATIC self
 -- @param DCS#country.id CountryID (Optional) The country ID used for spawning the new static. Default is same as currently.
@@ -224,7 +249,7 @@ function STATIC:ReSpawn(CountryID, Delay)
   else
 
     CountryID=CountryID or self:GetCountry()  
-
+   
     local SpawnStatic=SPAWNSTATIC:NewFromStatic(self.StaticName, CountryID)
     
     SpawnStatic:Spawn(nil, self.StaticName)
@@ -246,8 +271,8 @@ function STATIC:ReSpawnAt(Coordinate, Heading, Delay)
 
   if Delay and Delay>0 then
     SCHEDULER:New(nil, self.ReSpawnAt, {self, Coordinate, Heading}, Delay)
-  else
-  
+  else      
+      
     local SpawnStatic=SPAWNSTATIC:NewFromStatic(self.StaticName, self:GetCountry())
     
     SpawnStatic:SpawnFromCoordinate(Coordinate, Heading, self.StaticName)
@@ -257,3 +282,51 @@ function STATIC:ReSpawnAt(Coordinate, Heading, Delay)
   return self
 end
 
+--- Find the first(!) STATIC matching using patterns. Note that this is **a lot** slower than `:FindByName()`!
+-- @param #STATIC self
+-- @param #string Pattern The pattern to look for. Refer to [LUA patterns](http://www.easyuo.com/openeuo/wiki/index.php/Lua_Patterns_and_Captures_\(Regular_Expressions\)) for regular expressions in LUA.
+-- @return #STATIC The STATIC.
+-- @usage
+--          -- Find a static with a partial static name
+--          local grp = STATIC:FindByMatching( "Apple" )
+--          -- will return e.g. a static named "Apple-1-1"
+--
+--          -- using a pattern
+--          local grp = STATIC:FindByMatching( ".%d.%d$" )
+--          -- will return the first static found ending in "-1-1" to "-9-9", but not e.g. "-10-1"
+function STATIC:FindByMatching( Pattern )
+  local GroupFound = nil
+
+  for name,static in pairs(_DATABASE.STATICS) do
+    if string.match(name, Pattern ) then
+      GroupFound = static
+      break
+    end
+  end
+
+  return GroupFound
+end
+
+--- Find all STATIC objects matching using patterns. Note that this is **a lot** slower than `:FindByName()`!
+-- @param #STATIC self
+-- @param #string Pattern The pattern to look for. Refer to [LUA patterns](http://www.easyuo.com/openeuo/wiki/index.php/Lua_Patterns_and_Captures_\(Regular_Expressions\)) for regular expressions in LUA.
+-- @return #table Groups Table of matching #STATIC objects found
+-- @usage
+--          -- Find all static with a partial static name
+--          local grptable = STATIC:FindAllByMatching( "Apple" )
+--          -- will return all statics with "Apple" in the name
+--
+--          -- using a pattern
+--          local grp = STATIC:FindAllByMatching( ".%d.%d$" )
+--          -- will return the all statics found ending in "-1-1" to "-9-9", but not e.g. "-10-1" or "-1-10"
+function STATIC:FindAllByMatching( Pattern )
+  local GroupsFound = {}
+
+  for name,static in pairs(_DATABASE.STATICS) do
+    if string.match(name, Pattern ) then
+      GroupsFound[#GroupsFound+1] = static
+    end
+  end
+
+  return GroupsFound
+end

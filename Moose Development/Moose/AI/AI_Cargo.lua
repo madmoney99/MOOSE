@@ -9,7 +9,7 @@
 -- @module AI.AI_Cargo
 -- @image Cargo.JPG
 
---- @type AI_CARGO
+-- @type AI_CARGO
 -- @extends Core.Fsm#FSM_CONTROLLABLE
 
 
@@ -25,7 +25,12 @@
 --    * @{AI.AI_Cargo_APC} - Cargo transportation using APCs and other vehicles between zones.
 --    * @{AI.AI_Cargo_Helicopter} - Cargo transportation using helicopters between zones.
 --    * @{AI.AI_Cargo_Airplane} - Cargo transportation using airplanes to and from airbases.
---    
+--
+-- # Developer Note
+-- 
+-- Note while this class still works, it is no longer supported as the original author stopped active development of MOOSE
+-- Therefore, this class is considered to be deprecated
+-- 
 -- @field #AI_CARGO
 AI_CARGO = {
   ClassName = "AI_CARGO",
@@ -542,7 +547,7 @@ function AI_CARGO:onafterUnloaded( Carrier, From, Event, To, Cargo, CarrierUnit,
     for _, CarrierUnit in pairs( Carrier:GetUnits() ) do
       local CarrierUnit = CarrierUnit -- Wrapper.Unit#UNIT
       local IsEmpty = CarrierUnit:IsCargoEmpty()
-      self:I({ IsEmpty = IsEmpty })
+      self:T({ IsEmpty = IsEmpty })
       if not IsEmpty then
         AllUnloaded = false
         break

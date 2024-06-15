@@ -51,7 +51,7 @@
 -- @field #boolean Report If true, send status messages to coalition.
 -- @field Wrapper.Static#STATIC warehouse The phyical warehouse structure.
 -- @field #string alias Alias of the warehouse. Name its called when sending messages.
--- @field Core.Zone#ZONE zone Zone around the warehouse. If this zone is captured, the warehouse and all its assets goes to the capturing coaliton.
+-- @field Core.Zone#ZONE zone Zone around the warehouse. If this zone is captured, the warehouse and all its assets goes to the capturing coalition.
 -- @field Wrapper.Airbase#AIRBASE airbase Airbase the warehouse belongs to.
 -- @field #string airbasename Name of the airbase associated to the warehouse.
 -- @field Core.Point#COORDINATE road Closest point to warehouse on road.
@@ -87,7 +87,7 @@
 -- @field #number respawndelay Delay before respawn in seconds.
 -- @field #number runwaydestroyed Time stamp timer.getAbsTime() when the runway was destroyed.
 -- @field #number runwayrepairtime Time in seconds until runway will be repaired after it was destroyed. Default is 3600 sec (one hour).
--- @field Ops.FlightControl#FLIGHTCONTROL flightcontrol Flight control of this warehouse.
+-- @field OPS.FlightControl#FLIGHTCONTROL flightcontrol Flight control of this warehouse.
 -- @extends Core.Fsm#FSM
 
 --- Have your assets at the right place at the right time - or not!
@@ -302,8 +302,8 @@
 --
 -- Initial Spawn states is as follows:
 --    GROUND: ROE, "Return Fire" Alarm, "Green"
---    AIR: 	ROE, "Return Fire" Reaction to Threat, "Passive Defense"
---    NAVAL	ROE, "Return Fire" Alarm,"N/A"
+--    AIR:  ROE, "Return Fire" Reaction to Threat, "Passive Defense"
+--    NAVAL ROE, "Return Fire" Alarm,"N/A"
 --
 -- A request can be added by the @{#WAREHOUSE.AddRequest}(*warehouse*, *AssetDescriptor*, *AssetDescriptorValue*, *nAsset*, *TransportType*, *nTransport*, *Prio*, *Assignment*) function.
 -- The parameters are
@@ -349,6 +349,7 @@
 -- * @{#WAREHOUSE.Attribute.GROUND_APC} Infantry carriers, in particular Amoured Personell Carrier. This can be used to transport other assets.
 -- * @{#WAREHOUSE.Attribute.GROUND_TRUCK} Unarmed ground vehicles, which has the DCS "Truck" attribute.
 -- * @{#WAREHOUSE.Attribute.GROUND_INFANTRY} Ground infantry assets.
+-- * @{#WAREHOUSE.Attribute.GROUND_IFV} Ground infantry fighting vehicle.
 -- * @{#WAREHOUSE.Attribute.GROUND_ARTILLERY} Artillery assets.
 -- * @{#WAREHOUSE.Attribute.GROUND_TANK} Tanks (modern or old).
 -- * @{#WAREHOUSE.Attribute.GROUND_TRAIN} Trains. Not that trains are **not** yet properly implemented in DCS and cannot be used currently.
@@ -741,7 +742,7 @@
 --
 -- ## Save Assets
 --
--- Saving asset data to file is achieved by the @{WAREHOUSE.Save}(*path*, *filename*) function. The parameter *path* specifies the path on the file system where the
+-- Saving asset data to file is achieved by the @{#WAREHOUSE.Save}(*path*, *filename*) function. The parameter *path* specifies the path on the file system where the
 -- warehouse data is saved. If you do not specify a path, the file is saved your the DCS installation root directory.
 -- The parameter *filename* is optional and defines the name of the saved file. By default this is automatically created from the warehouse id and name, for example
 -- "Warehouse-1234_Batumi.txt".
@@ -752,13 +753,13 @@
 --
 -- ### Automatic Save at Mission End
 --
--- The assets can be saved automatically when the mission is ended via the @{WAREHOUSE.SetSaveOnMissionEnd}(*path*, *filename*) function, i.e.
+-- The assets can be saved automatically when the mission is ended via the @{#WAREHOUSE.SetSaveOnMissionEnd}(*path*, *filename*) function, i.e.
 --
 --     warehouseBatumi:SetSaveOnMissionEnd("D:\\My Warehouse Data\\")
 --
 -- ## Load Assets
 --
--- Loading assets data from file is achieved by the @{WAREHOUSE.Load}(*path*, *filename*) function. The parameter *path* specifies the path on the file system where the
+-- Loading assets data from file is achieved by the @{#WAREHOUSE.Load}(*path*, *filename*) function. The parameter *path* specifies the path on the file system where the
 -- warehouse data is loaded from. If you do not specify a path, the file is loaded from your the DCS installation root directory.
 -- The parameter *filename* is optional and defines the name of the file to load. By default this is automatically generated from the warehouse id and name, for example
 -- "Warehouse-1234_Batumi.txt".
@@ -772,7 +773,7 @@
 --     warehouseBatumi:Load("D:\\My Warehouse Data\\")
 --     warehouseBatumi:Start()
 --
--- This sequence loads all assets from file. If a warehouse was captured in the last mission, it also respawns the static warehouse structure with the right coaliton.
+-- This sequence loads all assets from file. If a warehouse was captured in the last mission, it also respawns the static warehouse structure with the right coalition.
 -- However, it due to DCS limitations it is not possible to set the airbase coalition. This has to be done manually in the mission editor. Or alternatively, one could
 -- spawn some ground units via a self request and let them capture the airbase.
 --
@@ -1273,7 +1274,7 @@
 --
 -- ## Example 13: Battlefield Air Interdiction
 --
--- This example show how to couple the WAREHOUSE class with the @{AI.AI_Bai} class.
+-- This example show how to couple the WAREHOUSE class with the @{AI.AI_BAI} class.
 -- Four enemy targets have been located at the famous Kobuleti X. All three available Viggen 2-ship flights are assigned to kill at least one of the BMPs to complete their mission.
 --
 --     -- Start Warehouse at Kobuleti.
@@ -1612,7 +1613,7 @@ WAREHOUSE = {
 -- @field #number range Range of the unit in meters.
 -- @field #number speedmax Maximum speed in km/h the group can do.
 -- @field #number size Maximum size in length and with of the asset in meters.
--- @field #number weight The weight of the whole asset group in kilo gramms.
+-- @field #number weight The weight of the whole asset group in kilograms.
 -- @field DCS#Object.Desc DCSdesc All DCS descriptors.
 -- @field #WAREHOUSE.Attribute attribute Generalized attribute of the group.
 -- @field #table cargobay Array of cargo bays of all units in an asset group.
@@ -1628,7 +1629,7 @@ WAREHOUSE = {
 -- @field #boolean arrived If true, asset arrived at its destination.
 -- 
 -- @field #number damage Damage of asset group in percent.
--- @field Ops.AirWing#AIRWING.Payload payload The payload of the asset.
+-- @field Ops.Airwing#AIRWING.Payload payload The payload of the asset.
 -- @field Ops.OpsGroup#OPSGROUP flightgroup The flightgroup object.
 -- @field Ops.Cohort#COHORT cohort The cohort this asset belongs to.
 -- @field Ops.Legion#LEGION legion The legion this asset belonts to.
@@ -1704,6 +1705,7 @@ WAREHOUSE.Descriptor = {
 -- @field #string GROUND_APC Infantry carriers, in particular Amoured Personell Carrier. This can be used to transport other assets.
 -- @field #string GROUND_TRUCK Unarmed ground vehicles, which has the DCS "Truck" attribute.
 -- @field #string GROUND_INFANTRY Ground infantry assets.
+-- @field #string GROUND_IFV Ground infantry fighting vehicle.
 -- @field #string GROUND_ARTILLERY Artillery assets.
 -- @field #string GROUND_TANK Tanks (modern or old).
 -- @field #string GROUND_TRAIN Trains. Not that trains are **not** yet properly implemented in DCS and cannot be used currently.
@@ -1730,6 +1732,7 @@ WAREHOUSE.Attribute = {
   GROUND_APC="Ground_APC",
   GROUND_TRUCK="Ground_Truck",
   GROUND_INFANTRY="Ground_Infantry",
+  GROUND_IFV="Ground_IFV",
   GROUND_ARTILLERY="Ground_Artillery",
   GROUND_TANK="Ground_Tank",
   GROUND_TRAIN="Ground_Train",
@@ -1795,7 +1798,7 @@ _WAREHOUSEDB  = {
 
 --- Warehouse class version.
 -- @field #string version
-WAREHOUSE.version="1.0.2"
+WAREHOUSE.version="1.0.2a"
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- TODO: Warehouse todo list.
@@ -1832,7 +1835,7 @@ WAREHOUSE.version="1.0.2"
 -- DONE: Add shipping lanes between warehouses.
 -- DONE: Handle cases with immobile units <== should be handled by dispatcher classes.
 -- DONE: Handle cases for aircraft carriers and other ships. Place warehouse on carrier possible? On others probably not - exclude them?
--- DONE: Add general message function for sending to coaliton or debug.
+-- DONE: Add general message function for sending to coalition or debug.
 -- DONE: Fine tune event handlers.
 -- DONE: Improve generalized attributes.
 -- DONE: If warehouse is destroyed, all asssets are gone.
@@ -1936,6 +1939,7 @@ function WAREHOUSE:New(warehouse, alias)
   self:SetMarker(true)
   self:SetReportOff()
   self:SetRunwayRepairtime()
+  self.allowSpawnOnClientSpots=false
 
   -- Add warehouse to database.
   _WAREHOUSEDB.Warehouses[self.uid]=self
@@ -2581,6 +2585,14 @@ function WAREHOUSE:SetSafeParkingOff()
   return self
 end
 
+--- Set wether client parking spots can be used for spawning.
+-- @param #WAREHOUSE self
+-- @return #WAREHOUSE self
+function WAREHOUSE:SetAllowSpawnOnClientParking()
+  self.allowSpawnOnClientSpots=true
+  return self
+end
+
 --- Set low fuel threshold. If one unit of an asset has less fuel than this number, the event AssetLowFuel will be fired.
 -- @param #WAREHOUSE self
 -- @param #number threshold Relative low fuel threshold, i.e. a number in [0,1]. Default 0.15 (15%).
@@ -2633,6 +2645,13 @@ end
 function WAREHOUSE:SetWarehouseZone(zone)
   self.zone=zone
   return self
+end
+
+--- Get the warehouse zone.
+-- @param #WAREHOUSE self
+-- @return Core.Zone#ZONE The warehouse zone.
+function WAREHOUSE:GetWarehouseZone()
+  return self.zone
 end
 
 --- Set auto defence on. When the warehouse is under attack, all ground assets are spawned automatically and will defend the warehouse zone.
@@ -3233,7 +3252,7 @@ end
 -- @param MinAssets (Optional) Minimum number of assets the warehouse should have. Default 0.
 -- @param #string Descriptor (Optional) Descriptor describing the selected assets which should be in stock. See @{#WAREHOUSE.Descriptor} for possible values.
 -- @param DescriptorValue (Optional) Descriptor value selecting the type of assets which should be in stock.
--- @param DCS#Coalition.side Coalition (Optional) Coalition side of the warehouse. Default is the same coaliton as the present warehouse. Set to false for any coalition.
+-- @param DCS#Coalition.side Coalition (Optional) Coalition side of the warehouse. Default is the same coalition as the present warehouse. Set to false for any coalition.
 -- @param Core.Point#COORDINATE RefCoordinate (Optional) Coordinate to which the closest warehouse is searched. Default is the warehouse calling this function.
 -- @return #WAREHOUSE The the nearest warehouse object. Or nil if no warehouse is found.
 -- @return #number The distance to the nearest warehouse in meters. Or nil if no warehouse is found.
@@ -3395,7 +3414,7 @@ end
 -- FSM states
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
---- On after Start event. Starts the warehouse. Addes event handlers and schedules status updates of reqests and queue.
+--- On after Start event. Starts the warehouse. Adds event handlers and schedules status updates of reqests and queue.
 -- @param #WAREHOUSE self
 -- @param #string From From state.
 -- @param #string Event Event.
@@ -3404,7 +3423,7 @@ function WAREHOUSE:onafterStart(From, Event, To)
 
   -- Short info.
   local text=string.format("Starting warehouse %s alias %s:\n",self.warehouse:GetName(), self.alias)
-  text=text..string.format("Coaliton = %s\n", self:GetCoalitionName())
+  text=text..string.format("Coalition = %s\n", self:GetCoalitionName())
   text=text..string.format("Country  = %s\n", self:GetCountryName())
   text=text..string.format("Airbase  = %s (category=%d)\n", self:GetAirbaseName(), self:GetAirbaseCategory())
   env.info(text)
@@ -3576,6 +3595,7 @@ function WAREHOUSE:onafterStatus(From, Event, To)
     local Trepair=self:GetRunwayRepairtime()
     self:I(self.lid..string.format("Runway destroyed! Will be repaired in %d sec", Trepair))
     if Trepair==0 then
+      self.runwaydestroyed = nil
       self:RunwayRepaired()
     end
   end
@@ -3597,9 +3617,10 @@ function WAREHOUSE:onafterStatus(From, Event, To)
   end
 
   -- Print queue after processing requests.
-  self:_PrintQueue(self.queue, "Queue waiting")
-  self:_PrintQueue(self.pending, "Queue pending")
-
+  if self.verbosity > 2 then
+    self:_PrintQueue(self.queue, "Queue waiting")
+    self:_PrintQueue(self.pending, "Queue pending")
+  end
   -- Check fuel for all assets.
   --self:_CheckFuel()
 
@@ -4082,9 +4103,9 @@ function WAREHOUSE:_RegisterAsset(group, ngroups, forceattribute, forcecargobay,
   -- Get the size of an object.
   local function _GetObjectSize(DCSdesc)
     if DCSdesc.box then
-      local x=DCSdesc.box.max.x+math.abs(DCSdesc.box.min.x)  --length
-      local y=DCSdesc.box.max.y+math.abs(DCSdesc.box.min.y)  --height
-      local z=DCSdesc.box.max.z+math.abs(DCSdesc.box.min.z)  --width
+      local x=DCSdesc.box.max.x-DCSdesc.box.min.x  --length
+      local y=DCSdesc.box.max.y-DCSdesc.box.min.y  --height
+      local z=DCSdesc.box.max.z-DCSdesc.box.min.z  --width
       return math.max(x,z), x , y, z
     end
     return 0,0,0,0
@@ -4542,7 +4563,8 @@ function WAREHOUSE:onafterRequest(From, Event, To, Request)
       self:_ErrorMessage("ERROR: Cargo transport by train not supported yet!")
       return
 
-    elseif Request.transporttype==WAREHOUSE.TransportType.SHIP or Request.transporttype==WAREHOUSE.TransportType.NAVALCARRIER then
+    elseif Request.transporttype==WAREHOUSE.TransportType.SHIP or Request.transporttype==WAREHOUSE.TransportType.NAVALCARRIER
+      or Request.transporttype==WAREHOUSE.TransportType.ARMEDSHIP or Request.transporttype==WAREHOUSE.TransportType.WARSHIP then
 
       -- Spawn Ship in port zone
       spawngroup=self:_SpawnAssetGroundNaval(_alias, _assetitem, Request, self.portzone)
@@ -5364,7 +5386,6 @@ end
 -- @param #string From From state.
 -- @param #string Event Event.
 -- @param #string To To state.
--- @param DCS#coalition.side Coalition Coalition side which originally captured the warehouse.
 function WAREHOUSE:onafterRunwayDestroyed(From, Event, To)
 
   -- Message.
@@ -5372,7 +5393,8 @@ function WAREHOUSE:onafterRunwayDestroyed(From, Event, To)
   self:_InfoMessage(text)
 
   self.runwaydestroyed=timer.getAbsTime()
-
+  
+  return self
 end
 
 --- On after "RunwayRepaired" event.
@@ -5387,7 +5409,8 @@ function WAREHOUSE:onafterRunwayRepaired(From, Event, To)
   self:_InfoMessage(text)
 
   self.runwaydestroyed=nil
-
+  
+  return self
 end
 
 
@@ -5479,8 +5502,13 @@ function WAREHOUSE:onafterAssetDead(From, Event, To, asset, request)
       ---
   
       -- Remove dead group from cargo group set.
-      request.cargogroupset:Remove(groupname, NoTriggerEvent)
-      self:T(self.lid..string.format("Removed selfpropelled cargo %s: ncargo=%d.", groupname, request.cargogroupset:Count()))
+      if request.cargogroupset then
+        -- cargogroupset was nil for user case. Difficult to reproduce so we add a nil check.
+        request.cargogroupset:Remove(groupname, NoTriggerEvent)
+        self:T(self.lid..string.format("Removed selfpropelled cargo %s: ncargo=%d.", groupname, request.cargogroupset:Count()))
+      else
+        self:E(self.lid..string.format("ERROR: cargogroupset is nil for request ID=%s!", tostring(request.uid)))
+      end
   
     else
   
@@ -5799,6 +5827,7 @@ function WAREHOUSE:_SpawnAssetRequest(Request)
   -- Now we try to find all parking spots for all cargo groups in advance. Due to the for loop, the parking spots do not get updated while spawning.
   local Parking={}
   if Request.cargocategory==Group.Category.AIRPLANE or Request.cargocategory==Group.Category.HELICOPTER then
+    --TODO: Check for airstart. Should be a request property.
     Parking=self:_FindParkingForAssets(self.airbase, cargoassets) or {}
   end
 
@@ -5810,62 +5839,65 @@ function WAREHOUSE:_SpawnAssetRequest(Request)
 
     -- Get stock item.
     local asset=cargoassets[i] --#WAREHOUSE.Assetitem
+    
+    if not asset.spawned then
 
-    -- Set asset status to not spawned until we capture its birth event.
-    asset.spawned=false
-    asset.iscargo=true
-
-    -- Set request ID.
-    asset.rid=Request.uid
-
-    -- Spawn group name.
-    local _alias=asset.spawngroupname
-
-    --Request add asset by id.
-    Request.assets[asset.uid]=asset
-
-    -- Spawn an asset group.
-    local _group=nil --Wrapper.Group#GROUP
-    if asset.category==Group.Category.GROUND then
-
-      -- Spawn ground troops.
-      _group=self:_SpawnAssetGroundNaval(_alias, asset, Request, self.spawnzone, Request.lateActivation)
-
-    elseif asset.category==Group.Category.AIRPLANE or asset.category==Group.Category.HELICOPTER then
-
-      -- Spawn air units.
-      if Parking[asset.uid] then
-        _group=self:_SpawnAssetAircraft(_alias, asset, Request, Parking[asset.uid], UnControlled, Request.lateActivation)
-      else
-        _group=self:_SpawnAssetAircraft(_alias, asset, Request, nil, UnControlled, Request.lateActivation)
-      end
-
-    elseif asset.category==Group.Category.TRAIN then
-
-      -- Spawn train.
-      if self.rail then
-        --TODO: Rail should only get one asset because they would spawn on top!
-
-        -- Spawn naval assets.
+      -- Set asset status to not spawned until we capture its birth event.
+      asset.iscargo=true
+  
+      -- Set request ID.
+      asset.rid=Request.uid
+  
+      -- Spawn group name.
+      local _alias=asset.spawngroupname
+  
+      --Request add asset by id.
+      Request.assets[asset.uid]=asset
+  
+      -- Spawn an asset group.
+      local _group=nil --Wrapper.Group#GROUP
+      if asset.category==Group.Category.GROUND then
+  
+        -- Spawn ground troops.
         _group=self:_SpawnAssetGroundNaval(_alias, asset, Request, self.spawnzone, Request.lateActivation)
+  
+      elseif asset.category==Group.Category.AIRPLANE or asset.category==Group.Category.HELICOPTER then
+  
+        -- Spawn air units.
+        if Parking[asset.uid] then
+          _group=self:_SpawnAssetAircraft(_alias, asset, Request, Parking[asset.uid], UnControlled, Request.lateActivation)
+        else
+          _group=self:_SpawnAssetAircraft(_alias, asset, Request, nil, UnControlled, Request.lateActivation)
+        end
+  
+      elseif asset.category==Group.Category.TRAIN then
+  
+        -- Spawn train.
+        if self.rail then
+          --TODO: Rail should only get one asset because they would spawn on top!
+  
+          -- Spawn naval assets.
+          _group=self:_SpawnAssetGroundNaval(_alias, asset, Request, self.spawnzone, Request.lateActivation)
+        end
+  
+        --self:E(self.lid.."ERROR: Spawning of TRAIN assets not possible yet!")
+  
+      elseif asset.category==Group.Category.SHIP then
+  
+        -- Spawn naval assets.
+        _group=self:_SpawnAssetGroundNaval(_alias, asset, Request, self.portzone, Request.lateActivation)
+  
+      else
+        self:E(self.lid.."ERROR: Unknown asset category!")
       end
-
-      --self:E(self.lid.."ERROR: Spawning of TRAIN assets not possible yet!")
-
-    elseif asset.category==Group.Category.SHIP then
-
-      -- Spawn naval assets.
-      _group=self:_SpawnAssetGroundNaval(_alias, asset, Request, self.portzone, Request.lateActivation)
-
-    else
-      self:E(self.lid.."ERROR: Unknown asset category!")
+      
+      -- Trigger event.
+      if _group then
+        self:__AssetSpawned(0.01, _group, asset, Request)
+      end    
+  
     end
     
-    -- Trigger event.
-    if _group then
-      self:__AssetSpawned(0.01, _group, asset, Request)
-    end    
-
   end
 
 end
@@ -6058,7 +6090,9 @@ function WAREHOUSE:_SpawnAssetAircraft(alias, asset, request, parking, uncontrol
         end
 
         if self.Debug then
-          coord:MarkToAll(string.format("Spawnplace unit %s terminal %d.", unit.name, terminal))
+          local text=string.format("Spawnplace unit %s terminal %d.", unit.name, terminal)
+          coord:MarkToAll(text)
+          env.info(text)
         end
 
         unit.x=coord.x
@@ -6311,10 +6345,11 @@ function WAREHOUSE:_RouteAir(aircraft)
     self:T2(self.lid..string.format("RouteAir aircraft group %s alive=%s", aircraft:GetName(), tostring(aircraft:IsAlive())))
 
     -- Give start command to activate uncontrolled aircraft within the next 60 seconds.
-    if not self.flightcontrol then
-      local starttime=math.random(60)
-
-      aircraft:StartUncontrolled(starttime)
+    if self.flightcontrol then
+      local fg=FLIGHTGROUP:New(aircraft)
+      fg:SetReadyForTakeoff(true)    
+    else
+      aircraft:StartUncontrolled(math.random(60))
     end
 
     -- Debug info.
@@ -6645,7 +6680,13 @@ function WAREHOUSE:_OnEventCrashOrDead(EventData)
         self:Destroyed()
       end
       if self.airbase and self.airbasename and self.airbasename==EventData.IniUnitName then
-        self:RunwayDestroyed()      
+        if self:IsRunwayOperational() then
+          -- Trigger RunwayDestroyed event (only if it is not destroyed already)
+          self:RunwayDestroyed()
+        else
+          -- Reset the time stamp.
+          self.runwaydestroyed=timer.getAbsTime()
+        end        
       end
     end
 
@@ -6735,7 +6776,7 @@ function WAREHOUSE:_UnitDead(deadunit, deadgroup, request)
   -- Dont trigger a Remove event for the group sets.
   local NoTriggerEvent=true
 
-  if not request.transporttype==WAREHOUSE.TransportType.SELFPROPELLED then
+  if request.transporttype~=WAREHOUSE.TransportType.SELFPROPELLED then
 
     ---
     -- Complicated case: Dead unit could be:
@@ -6802,7 +6843,7 @@ function WAREHOUSE:_OnEventBaseCaptured(EventData)
           self:AirbaseRecaptured(NewCoalitionAirbase)
         end
       else
-        -- Captured airbase belongs to this warehouse but was captured by other coaltion.
+        -- Captured airbase belongs to this warehouse but was captured by other coalition.
         if NewCoalitionAirbase ~= self:GetCoalition() then
           self:AirbaseCaptured(NewCoalitionAirbase)
         end
@@ -6995,7 +7036,7 @@ function WAREHOUSE:_CheckRequestConsistancy(queue)
 
     -- Request from enemy coalition?
     if self:GetCoalition()~=request.warehouse:GetCoalition() then
-      self:E(self.lid..string.format("ERROR: INVALID request. Requesting warehouse is of wrong coaltion! Own coalition %s != %s of requesting warehouse.", self:GetCoalitionName(), request.warehouse:GetCoalitionName()))
+      self:E(self.lid..string.format("ERROR: INVALID request. Requesting warehouse is of wrong coalition! Own coalition %s != %s of requesting warehouse.", self:GetCoalitionName(), request.warehouse:GetCoalitionName()))
       valid=false
     end
 
@@ -7362,28 +7403,51 @@ function WAREHOUSE:_CheckRequestNow(request)
   local _transports
   local _assetattribute
   local _assetcategory
+  local _assetairstart=false
 
   -- Check if at least one (cargo) asset is available.
   if _nassets>0 then
+  
+    local asset=_assets[1] --#WAREHOUSE.Assetitem
 
     -- Get the attibute of the requested asset.
     _assetattribute=_assets[1].attribute
     _assetcategory=_assets[1].category
+    _assetairstart=_assets[1].takeoffType and _assets[1].takeoffType==COORDINATE.WaypointType.TurningPoint or false
 
     -- Check available parking for air asset units.
     if _assetcategory==Group.Category.AIRPLANE or _assetcategory==Group.Category.HELICOPTER then
     
       if self.airbase and self.airbase:GetCoalition()==self:GetCoalition() then
-    
-        if self:IsRunwayOperational() then
-  
-          local Parking=self:_FindParkingForAssets(self.airbase,_assets)
-    
-          --if Parking==nil and not (self.category==Airbase.Category.HELIPAD) then
-          if Parking==nil then
-            local text=string.format("Warehouse %s: Request denied! Not enough free parking spots for all requested assets at the moment.", self.alias)
-            self:_InfoMessage(text, 5)
+      
+        -- Check if DCS warehouse of airbase has enough assets        
+        if self.airbase.storage then
+          local nS=self.airbase.storage:GetAmount(asset.unittype)
+          local nA=asset.nunits*request.nasset  -- Number of units requested
+          if nS<nA then
+            local text=string.format("Warehouse %s: Request denied! DCS Warehouse has only %d assets of type %s ==> NOT enough to spawn the requested %d asset units (%d groups)", 
+            self.alias, nS, asset.unittype, nA, request.nasset)
+            self:_InfoMessage(text, 5)            
             return false
+          end
+        end
+        
+    
+        if self:IsRunwayOperational() or _assetairstart then
+  
+          if _assetairstart then
+            -- Airstart no need to check parking
+          else
+          
+            -- Check parking.
+            local Parking=self:_FindParkingForAssets(self.airbase,_assets)
+      
+            -- No parking?
+            if Parking==nil then
+              local text=string.format("Warehouse %s: Request denied! Not enough free parking spots for all requested assets at the moment.", self.alias)
+              self:_InfoMessage(text, 5)
+              return false
+            end
           end
           
         else
@@ -7484,6 +7548,9 @@ function WAREHOUSE:_CheckRequestNow(request)
         self:_InfoMessage(text, 5)
         return false
       end
+      
+    elseif _assetcategory==Group.Category.AIRPLANE or _assetcategory==Group.Category.HELICOPTER then
+
 
     end
 
@@ -7824,7 +7891,7 @@ function WAREHOUSE:_GetTerminal(_attribute, _category)
   -- Default terminal is "large".
   local _terminal=AIRBASE.TerminalType.OpenBig
 
-  if _attribute==WAREHOUSE.Attribute.AIR_FIGHTER then
+  if _attribute==WAREHOUSE.Attribute.AIR_FIGHTER or _attribute==WAREHOUSE.Attribute.AIR_UAV then
     -- Fighter ==> small.
     _terminal=AIRBASE.TerminalType.FighterAircraft
   elseif _attribute==WAREHOUSE.Attribute.AIR_BOMBER or _attribute==WAREHOUSE.Attribute.AIR_TRANSPORTPLANE or _attribute==WAREHOUSE.Attribute.AIR_TANKER or _attribute==WAREHOUSE.Attribute.AIR_AWACS then
@@ -7874,14 +7941,16 @@ function WAREHOUSE:_FindParkingForAssets(airbase, assets)
 
   -- Get client coordinates.
   local function _clients()
-    local clients=_DATABASE.CLIENTS
     local coords={}
-    for clientname, client in pairs(clients) do
-      local template=_DATABASE:GetGroupTemplateFromUnitName(clientname)
-      local units=template.units
-      for i,unit in pairs(units) do
-        local coord=COORDINATE:New(unit.x, unit.alt, unit.y)
-        coords[unit.name]=coord
+    if not self.allowSpawnOnClientSpots then  
+      local clients=_DATABASE.CLIENTS
+      for clientname, client in pairs(clients) do
+        local template=_DATABASE:GetGroupTemplateFromUnitName(clientname)
+        local units=template.units
+        for i,unit in pairs(units) do
+          local coord=COORDINATE:New(unit.x, unit.alt, unit.y)
+          coords[unit.name]=coord
+        end
       end
     end
     return coords
@@ -7955,93 +8024,123 @@ function WAREHOUSE:_FindParkingForAssets(airbase, assets)
   -- Loop over all assets that need a parking psot.
   for _,asset in pairs(assets) do
     local _asset=asset --#WAREHOUSE.Assetitem
-
-    -- Get terminal type of this asset
-    local terminaltype=asset.terminalType or self:_GetTerminal(asset.attribute, self:GetAirbaseCategory())
-
-    -- Asset specific parking.
-    parking[_asset.uid]={}
-
-    -- Loop over all units - each one needs a spot.
-    for i=1,_asset.nunits do
     
-      -- Asset name
-      local assetname=_asset.spawngroupname.."-"..tostring(i)
+    if not _asset.spawned then
 
-      -- Loop over all parking spots.
-      local gotit=false
-      for _,_parkingspot in pairs(parkingdata) do
-        local parkingspot=_parkingspot --Wrapper.Airbase#AIRBASE.ParkingSpot
-
-        -- Check correct terminal type for asset. We don't want helos in shelters etc.
-        if AIRBASE._CheckTerminalType(parkingspot.TerminalType, terminaltype) and self:_CheckParkingValid(parkingspot) and self:_CheckParkingAsset(parkingspot, asset) and airbase:_CheckParkingLists(parkingspot.TerminalID) then
-
-          -- Coordinate of the parking spot.
-          local _spot=parkingspot.Coordinate   -- Core.Point#COORDINATE
-          local _termid=parkingspot.TerminalID
-          local free=true
-          local problem=nil
-
-          -- Loop over all obstacles.
-          for _,obstacle in pairs(obstacles) do
-
-            -- Check if aircraft overlaps with any obstacle.
-            local dist=_spot:Get2DDistance(obstacle.coord)
-            local safe=_overlap(_asset.size, obstacle.size, dist)
-
-            -- Spot is blocked.
-            if not safe then
-              self:T3(self.lid..string.format("FF asset=%s (id=%d): spot id=%d dist=%.1fm is NOT SAFE", assetname, _asset.uid, _termid, dist))
-              free=false
-              problem=obstacle
-              problem.dist=dist
-              break
-            else
-              --env.info(string.format("FF asset=%s (id=%d): spot id=%d dist=%.1fm is SAFE", assetname, _asset.uid, _termid, dist))
-            end
-
-          end
-
-          -- Check if spot is free
-          if free then
-
-            -- Add parkingspot for this asset unit.
-            table.insert(parking[_asset.uid], parkingspot)
-
-            -- Debug
-            self:T(self.lid..string.format("Parking spot %d is free for asset %s [id=%d]!", _termid, assetname, _asset.uid))
-
-            -- Add the unit as obstacle so that this spot will not be available for the next unit.
-            table.insert(obstacles, {coord=_spot, size=_asset.size, name=assetname, type="asset"})
-
-            gotit=true
-            break
-
+      -- Get terminal type of this asset
+      local terminaltype=asset.terminalType or self:_GetTerminal(asset.attribute, self:GetAirbaseCategory())
+  
+      -- Asset specific parking.
+      parking[_asset.uid]={}
+  
+      -- Loop over all units - each one needs a spot.
+      for i=1,_asset.nunits do
+      
+        -- Asset name
+        local assetname=_asset.spawngroupname.."-"..tostring(i)
+  
+        -- Loop over all parking spots.
+        local gotit=false
+        for _,_parkingspot in pairs(parkingdata) do
+          local parkingspot=_parkingspot --Wrapper.Airbase#AIRBASE.ParkingSpot
+          
+          -- Parking valid?
+          local valid=true
+          
+          if asset.parkingIDs then
+            -- If asset has assigned parking spots, we take these no matter what.
+            valid=self:_CheckParkingAsset(parkingspot, asset)
           else
-
-            -- Debug output for occupied spots.            
-            if self.Debug then
-              local coord=problem.coord --Core.Point#COORDINATE
-              local text=string.format("Obstacle %s [type=%s] blocking spot=%d! Size=%.1f m and distance=%.1f m.", problem.name, problem.type, _termid, problem.size, problem.dist)
-              self:I(self.lid..text)
-              coord:MarkToAll(string.format(text))
-            else
-              self:T(self.lid..string.format("Parking spot %d is occupied or not big enough!", _termid))
-            end
-
+  
+            -- Valid terminal type depending on attribute.
+            local validTerminal=AIRBASE._CheckTerminalType(parkingspot.TerminalType, terminaltype)
+            
+            -- Valid parking list.
+            local validParking=self:_CheckParkingValid(parkingspot)
+            
+            -- Black and white list.
+            local validBWlist=airbase:_CheckParkingLists(parkingspot.TerminalID)        
+  
+            -- Debug info.
+            --env.info(string.format("FF validTerminal = %s", tostring(validTerminal)))
+            --env.info(string.format("FF validParking  = %s", tostring(validParking)))
+            --env.info(string.format("FF validBWlist   = %s", tostring(validBWlist)))
+          
+            -- Check if all are true
+            valid=validTerminal and validParking and validBWlist
           end
-
-        else
-          self:T2(self.lid..string.format("Terminal ID=%d: type=%s not supported", parkingspot.TerminalID, parkingspot.TerminalType))
-        end -- check terminal type
-      end -- loop over parking spots
-
-      -- No parking spot for at least one asset :(
-      if not gotit then
-        self:I(self.lid..string.format("WARNING: No free parking spot for asset %s [id=%d]", assetname, _asset.uid))
-        return nil
-      end
-    end -- loop over asset units
+          
+  
+          -- Check correct terminal type for asset. We don't want helos in shelters etc.
+          if valid then
+  
+            -- Coordinate of the parking spot.
+            local _spot=parkingspot.Coordinate   -- Core.Point#COORDINATE
+            local _termid=parkingspot.TerminalID
+            local free=true
+            local problem=nil
+  
+            -- Loop over all obstacles.
+            for _,obstacle in pairs(obstacles) do
+  
+              -- Check if aircraft overlaps with any obstacle.
+              local dist=_spot:Get2DDistance(obstacle.coord)
+              local safe=_overlap(_asset.size, obstacle.size, dist)
+  
+              -- Spot is blocked.
+              if not safe then
+                self:T3(self.lid..string.format("FF asset=%s (id=%d): spot id=%d dist=%.1fm is NOT SAFE", assetname, _asset.uid, _termid, dist))
+                free=false
+                problem=obstacle
+                problem.dist=dist
+                break
+              else
+                --env.info(string.format("FF asset=%s (id=%d): spot id=%d dist=%.1fm is SAFE", assetname, _asset.uid, _termid, dist))
+              end
+  
+            end
+  
+            -- Check if spot is free
+            if free then
+  
+              -- Add parkingspot for this asset unit.
+              table.insert(parking[_asset.uid], parkingspot)
+  
+              -- Debug
+              self:T(self.lid..string.format("Parking spot %d is free for asset %s [id=%d]!", _termid, assetname, _asset.uid))
+  
+              -- Add the unit as obstacle so that this spot will not be available for the next unit.
+              table.insert(obstacles, {coord=_spot, size=_asset.size, name=assetname, type="asset"})
+  
+              gotit=true
+              break
+  
+            else
+  
+              -- Debug output for occupied spots.            
+              if self.Debug then
+                local coord=problem.coord --Core.Point#COORDINATE
+                local text=string.format("Obstacle %s [type=%s] blocking spot=%d! Size=%.1f m and distance=%.1f m.", problem.name, problem.type, _termid, problem.size, problem.dist)
+                self:I(self.lid..text)
+                coord:MarkToAll(string.format(text))
+              else
+                self:T(self.lid..string.format("Parking spot %d is occupied or not big enough!", _termid))
+              end
+  
+            end
+  
+          else
+            self:T2(self.lid..string.format("Terminal ID=%d: type=%s not supported", parkingspot.TerminalID, parkingspot.TerminalType))
+          end -- check terminal type
+        end -- loop over parking spots
+  
+        -- No parking spot for at least one asset :(
+        if not gotit then
+          self:I(self.lid..string.format("WARNING: No free parking spot for asset %s [id=%d]", assetname, _asset.uid))
+          return nil
+        end
+      end -- loop over asset units
+    end -- Asset spawned check
   end -- loop over asset groups
 
   return parking
@@ -8157,7 +8256,7 @@ end
 -- @return #number Request ID.
 function WAREHOUSE:_GetIDsFromGroupName(groupname)
 
-  ---@param #string text The text to analyse.
+  -- @param #string text The text to analyse.
   local function analyse(text)
 
     -- Get rid of #0001 tail from spawn.
@@ -8351,9 +8450,10 @@ function WAREHOUSE:_GetAttribute(group)
     --- Ground ---
     --------------
     -- Ground
-    local apc=group:HasAttribute("Infantry carriers")
+    local apc=group:HasAttribute("APC") --("Infantry carriers")
     local truck=group:HasAttribute("Trucks") and group:GetCategory()==Group.Category.GROUND
     local infantry=group:HasAttribute("Infantry")
+    local ifv=group:HasAttribute("IFV")
     local artillery=group:HasAttribute("Artillery")
     local tank=group:HasAttribute("Old Tanks") or group:HasAttribute("Modern Tanks")
     local aaa=group:HasAttribute("AAA")
@@ -8390,6 +8490,8 @@ function WAREHOUSE:_GetAttribute(group)
       attribute=WAREHOUSE.Attribute.AIR_UAV
     elseif apc then
       attribute=WAREHOUSE.Attribute.GROUND_APC
+    elseif ifv then
+      attribute=WAREHOUSE.Attribute.GROUND_IFV
     elseif infantry then
       attribute=WAREHOUSE.Attribute.GROUND_INFANTRY
     elseif artillery then
@@ -8719,7 +8821,7 @@ function WAREHOUSE:_GetStockAssetsText(messagetoall)
 end
 
 --- Create or update mark text at warehouse, which is displayed in F10 map showing how many assets of each type are in stock.
--- Only the coaliton of the warehouse owner is able to see it.
+-- Only the coalition of the warehouse owner is able to see it.
 -- @param #WAREHOUSE self
 -- @return #string Text about warehouse stock
 function WAREHOUSE:_UpdateWarehouseMarkText()

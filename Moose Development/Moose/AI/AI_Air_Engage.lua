@@ -1,6 +1,6 @@
---- **AI** -- Models the process of air to ground engagement for airplanes and helicopters.
+--- **AI** - Models the process of air to ground engagement for airplanes and helicopters.
 --
--- This is a class used in the @{AI_A2G_Dispatcher}.
+-- This is a class used in the @{AI.AI_A2G_Dispatcher}.
 -- 
 -- ===
 -- 
@@ -13,62 +13,46 @@
 
 
 
---- @type AI_AIR_ENGAGE
+-- @type AI_AIR_ENGAGE
 -- @extends AI.AI_AIR#AI_AIR
 
 
 --- Implements the core functions to intercept intruders. Use the Engage trigger to intercept intruders.
 -- 
--- ![Process](..\Presentations\AI_GCI\Dia3.JPG)
--- 
 -- The AI_AIR_ENGAGE is assigned a @{Wrapper.Group} and this must be done before the AI_AIR_ENGAGE process can be started using the **Start** event.
--- 
--- ![Process](..\Presentations\AI_GCI\Dia4.JPG)
 -- 
 -- The AI will fly towards the random 3D point within the patrol zone, using a random speed within the given altitude and speed limits.
 -- Upon arrival at the 3D point, a new random 3D point will be selected within the patrol zone using the given limits.
 -- 
--- ![Process](..\Presentations\AI_GCI\Dia5.JPG)
--- 
 -- This cycle will continue.
 -- 
--- ![Process](..\Presentations\AI_GCI\Dia6.JPG)
--- 
 -- During the patrol, the AI will detect enemy targets, which are reported through the **Detected** event.
---
--- ![Process](..\Presentations\AI_GCI\Dia9.JPG)
 -- 
 -- When enemies are detected, the AI will automatically engage the enemy.
 -- 
--- ![Process](..\Presentations\AI_GCI\Dia10.JPG)
--- 
--- Until a fuel or damage treshold has been reached by the AI, or when the AI is commanded to RTB.
--- When the fuel treshold has been reached, the airplane will fly towards the nearest friendly airbase and will land.
--- 
--- ![Process](..\Presentations\AI_GCI\Dia13.JPG)
+-- Until a fuel or damage threshold has been reached by the AI, or when the AI is commanded to RTB.
+-- When the fuel threshold has been reached, the airplane will fly towards the nearest friendly airbase and will land.
 -- 
 -- ## 1. AI_AIR_ENGAGE constructor
 --   
 --   * @{#AI_AIR_ENGAGE.New}(): Creates a new AI_AIR_ENGAGE object.
 --
--- ## 3. Set the Range of Engagement
--- 
--- ![Range](..\Presentations\AI_GCI\Dia11.JPG)
--- 
--- An optional range can be set in meters, 
--- that will define when the AI will engage with the detected airborne enemy targets.
--- The range can be beyond or smaller than the range of the Patrol Zone.
--- The range is applied at the position of the AI.
--- Use the method @{AI.AI_GCI#AI_AIR_ENGAGE.SetEngageRange}() to define that range.
+-- ## 2. Set the Zone of Engagement
 --
--- ## 4. Set the Zone of Engagement
--- 
--- ![Zone](..\Presentations\AI_GCI\Dia12.JPG)
--- 
--- An optional @{Zone} can be set, 
+-- An optional @{Core.Zone} can be set,
 -- that will define when the AI will engage with the detected airborne enemy targets.
--- Use the method @{AI.AI_Cap#AI_AIR_ENGAGE.SetEngageZone}() to define that Zone.
---  
+-- Use the method @{AI.AI_CAP#AI_AIR_ENGAGE.SetEngageZone}() to define that Zone.
+  --
+  -- # Developer Note
+  -- 
+  -- Note while this class still works, it is no longer supported as the original author stopped active development of MOOSE
+  -- Therefore, this class is considered to be deprecated
+  --
+-- # Developer Note
+-- 
+-- Note while this class still works, it is no longer supported as the original author stopped active development of MOOSE
+-- Therefore, this class is considered to be deprecated
+--
 -- ===
 -- 
 -- @field #AI_AIR_ENGAGE
@@ -367,7 +351,7 @@ function AI_AIR_ENGAGE:onafterAbort( AIGroup, From, Event, To )
 end
 
 
---- @param #AI_AIR_ENGAGE self
+-- @param #AI_AIR_ENGAGE self
 -- @param Wrapper.Group#GROUP AIGroup The Group Object managed by the FSM.
 -- @param #string From The From State string.
 -- @param #string Event The Event string.
@@ -377,7 +361,7 @@ function AI_AIR_ENGAGE:onafterAccomplish( AIGroup, From, Event, To )
   --self:SetDetectionOff()
 end
 
---- @param #AI_AIR_ENGAGE self
+-- @param #AI_AIR_ENGAGE self
 -- @param Wrapper.Group#GROUP AIGroup The Group Object managed by the FSM.
 -- @param #string From The From State string.
 -- @param #string Event The Event string.
@@ -390,7 +374,7 @@ function AI_AIR_ENGAGE:onafterDestroy( AIGroup, From, Event, To, EventData )
   end
 end
 
---- @param #AI_AIR_ENGAGE self
+-- @param #AI_AIR_ENGAGE self
 -- @param Core.Event#EVENTDATA EventData
 function AI_AIR_ENGAGE:OnEventDead( EventData )
   self:F( { "EventDead", EventData } )
@@ -403,9 +387,9 @@ function AI_AIR_ENGAGE:OnEventDead( EventData )
 end
 
 
---- @param Wrapper.Group#GROUP AIControllable
+-- @param Wrapper.Group#GROUP AIControllable
 function AI_AIR_ENGAGE.___EngageRoute( AIGroup, Fsm, AttackSetUnit )
-  Fsm:I(string.format("AI_AIR_ENGAGE.___EngageRoute: %s", tostring(AIGroup:GetName())))
+  Fsm:T(string.format("AI_AIR_ENGAGE.___EngageRoute: %s", tostring(AIGroup:GetName())))
   
   if AIGroup and AIGroup:IsAlive() then
     Fsm:__EngageRoute( Fsm.TaskDelay or 0.1, AttackSetUnit )
@@ -413,14 +397,14 @@ function AI_AIR_ENGAGE.___EngageRoute( AIGroup, Fsm, AttackSetUnit )
 end
 
 
---- @param #AI_AIR_ENGAGE self
+-- @param #AI_AIR_ENGAGE self
 -- @param Wrapper.Group#GROUP DefenderGroup The GroupGroup managed by the FSM.
 -- @param #string From The From State string.
 -- @param #string Event The Event string.
 -- @param #string To The To State string.
 -- @param Core.Set#SET_UNIT AttackSetUnit Unit set to be attacked.
 function AI_AIR_ENGAGE:onafterEngageRoute( DefenderGroup, From, Event, To, AttackSetUnit )
-  self:I( { DefenderGroup, From, Event, To, AttackSetUnit } )
+  self:T( { DefenderGroup, From, Event, To, AttackSetUnit } )
   
   local DefenderGroupName = DefenderGroup:GetName()
 
@@ -442,7 +426,13 @@ function AI_AIR_ENGAGE:onafterEngageRoute( DefenderGroup, From, Event, To, Attac
       local DefenderCoord = DefenderGroup:GetPointVec3()
       DefenderCoord:SetY( EngageAltitude ) -- Ground targets don't have an altitude.
 
-      local TargetCoord = AttackSetUnit:GetFirst():GetPointVec3()
+      local TargetCoord = AttackSetUnit:GetRandomSurely():GetPointVec3()
+      
+      if TargetCoord == nil then
+        self:Return()
+        return
+      end
+      
       TargetCoord:SetY( EngageAltitude ) -- Ground targets don't have an altitude.
       
       local TargetDistance = DefenderCoord:Get2DDistance( TargetCoord )
@@ -451,12 +441,12 @@ function AI_AIR_ENGAGE:onafterEngageRoute( DefenderGroup, From, Event, To, Attac
       -- TODO: A factor of * 3 is way too close. This causes the AI not to engange until merged sometimes!
       if TargetDistance <= EngageDistance * 9 then
 
-        self:I(string.format("AI_AIR_ENGAGE onafterEngageRoute ==> __Engage - target distance = %.1f km", TargetDistance/1000))
+        --self:T(string.format("AI_AIR_ENGAGE onafterEngageRoute ==> __Engage - target distance = %.1f km", TargetDistance/1000))
         self:__Engage( 0.1, AttackSetUnit )
 
       else
       
-        self:I(string.format("FF AI_AIR_ENGAGE onafterEngageRoute ==> Routing - target distance = %.1f km", TargetDistance/1000))
+        --self:T(string.format("FF AI_AIR_ENGAGE onafterEngageRoute ==> Routing - target distance = %.1f km", TargetDistance/1000))
 
         local EngageRoute = {}
         local AttackTasks = {}
@@ -488,16 +478,16 @@ function AI_AIR_ENGAGE:onafterEngageRoute( DefenderGroup, From, Event, To, Attac
     end
   else
     -- TODO: This will make an A2A Dispatcher CAP flight to return rather than going back to patrolling!
-    self:I( DefenderGroupName .. ": No targets found -> Going RTB")
+    self:T( DefenderGroupName .. ": No targets found -> Going RTB")
     self:Return()
   end
 end
 
 
---- @param Wrapper.Group#GROUP AIControllable
+-- @param Wrapper.Group#GROUP AIControllable
 function AI_AIR_ENGAGE.___Engage( AIGroup, Fsm, AttackSetUnit )
 
-  Fsm:I(string.format("AI_AIR_ENGAGE.___Engage: %s", tostring(AIGroup:GetName())))
+  Fsm:T(string.format("AI_AIR_ENGAGE.___Engage: %s", tostring(AIGroup:GetName())))
   
   if AIGroup and AIGroup:IsAlive() then
     local delay=Fsm.TaskDelay or 0.1
@@ -506,7 +496,7 @@ function AI_AIR_ENGAGE.___Engage( AIGroup, Fsm, AttackSetUnit )
 end
 
 
---- @param #AI_AIR_ENGAGE self
+-- @param #AI_AIR_ENGAGE self
 -- @param Wrapper.Group#GROUP DefenderGroup The GroupGroup managed by the FSM.
 -- @param #string From The From State string.
 -- @param #string Event The Event string.
@@ -532,7 +522,11 @@ function AI_AIR_ENGAGE:onafterEngage( DefenderGroup, From, Event, To, AttackSetU
       local DefenderCoord = DefenderGroup:GetPointVec3()
       DefenderCoord:SetY( EngageAltitude ) -- Ground targets don't have an altitude.
 
-      local TargetCoord = AttackSetUnit:GetFirst():GetPointVec3()
+      local TargetCoord = AttackSetUnit:GetRandomSurely():GetPointVec3()
+      if not TargetCoord then
+          self:Return()
+          return
+      end
       TargetCoord:SetY( EngageAltitude ) -- Ground targets don't have an altitude.
       
       local TargetDistance = DefenderCoord:Get2DDistance( TargetCoord )
@@ -559,12 +553,12 @@ function AI_AIR_ENGAGE:onafterEngage( DefenderGroup, From, Event, To, AttackSetU
         local AttackUnitTasks = self:CreateAttackUnitTasks( AttackSetUnit, DefenderGroup, EngageAltitude ) -- Polymorphic
         
         if #AttackUnitTasks == 0 then
-          self:I( DefenderGroupName .. ": No valid targets found -> Going RTB")
+          self:T( DefenderGroupName .. ": No valid targets found -> Going RTB")
           self:Return()
           return
         else
           local text=string.format("%s: Engaging targets at distance %.2f NM", DefenderGroupName, UTILS.MetersToNM(TargetDistance))
-          self:I(text)
+          self:T(text)
           DefenderGroup:OptionROEOpenFire()
           DefenderGroup:OptionROTEvadeFire()
           DefenderGroup:OptionKeepWeaponsOnThreat()
@@ -581,13 +575,13 @@ function AI_AIR_ENGAGE:onafterEngage( DefenderGroup, From, Event, To, AttackSetU
     end
   else
     -- TODO: This will make an A2A Dispatcher CAP flight to return rather than going back to patrolling!
-    self:I( DefenderGroupName .. ": No targets found -> returning.")
+    self:T( DefenderGroupName .. ": No targets found -> returning.")
     self:Return()
     return
   end
 end
 
---- @param Wrapper.Group#GROUP AIEngage
+-- @param Wrapper.Group#GROUP AIEngage
 function AI_AIR_ENGAGE.Resume( AIEngage, Fsm )
 
   AIEngage:F( { "Resume:", AIEngage:GetName() } )

@@ -1,6 +1,6 @@
 --- **AI** - Models squadrons for airplanes and helicopters.
 --
--- This is a class used in the @{AI_Air_Dispatcher} and derived dispatcher classes.
+-- This is a class used in the @{AI.AI_Air_Dispatcher} and derived dispatcher classes.
 -- 
 -- ===
 -- 
@@ -13,12 +13,17 @@
 
 
 
---- @type AI_AIR_SQUADRON
+-- @type AI_AIR_SQUADRON
 -- @extends Core.Base#BASE
 
 
 --- Implements the core functions modeling squadrons for airplanes and helicopters.
+--
+-- # Developer Note
 -- 
+-- Note while this class still works, it is no longer supported as the original author stopped active development of MOOSE
+-- Therefore, this class is considered to be deprecated
+--
 -- ===
 -- 
 -- @field #AI_AIR_SQUADRON
@@ -33,7 +38,7 @@ AI_AIR_SQUADRON = {
 -- @return #AI_AIR_SQUADRON
 function AI_AIR_SQUADRON:New( SquadronName, AirbaseName, TemplatePrefixes, ResourceCount )
 
-  self:I( { Air_Squadron = { SquadronName, AirbaseName, TemplatePrefixes, ResourceCount } } )
+  self:T( { Air_Squadron = { SquadronName, AirbaseName, TemplatePrefixes, ResourceCount } } )
 
   local AI_Air_Squadron = BASE:New() -- #AI_AIR_SQUADRON
   

@@ -1,16 +1,23 @@
---- **Core** - MarkerOps_Base.
+--- **Core** - Tap into markers added to the F10 map by users.
 --
 -- **Main Features:**
 --
 --    * Create an easy way to tap into markers added to the F10 map by users.
 --    * Recognize own tag and list of keywords.
 --    * Matched keywords are handed down to functions.
+-- ##Listen for your tag
+--    myMarker = MARKEROPS_BASE:New("tag", {}, false)
+--    function myMarker:OnAfterMarkChanged(From, Event, To, Text, Keywords, Coord, idx)
+--
+--    end
+-- Make sure to use the "MarkChanged" event as "MarkAdded" comes in right after the user places a blank marker and your callback will never be called.
 --
 -- ===
 --
 -- ### Author: **Applevangelist**
 -- 
 -- Date: 5 May 2021
+-- Last Update: Mar 2023
 -- 
 -- ===
 ---
@@ -27,6 +34,7 @@
 -- @field #string Tag Tag to identify commands.
 -- @field #table Keywords Table of keywords to recognize.
 -- @field #string version Version of #MARKEROPS_BASE.
+-- @field #boolean Casesensitive Enforce case when identifying the Tag, i.e. tag ~= Tag
 -- @extends Core.Fsm#FSM
 
 --- *Fiat lux.* -- Latin proverb.
@@ -42,16 +50,18 @@ MARKEROPS_BASE = {
   ClassName = "MARKEROPS",
   Tag = "mytag",
   Keywords = {},
-  version = "0.0.1",
+  version = "0.1.3",
   debug = false,
+  Casesensitive = true,
 }
 
 --- Function to instantiate a new #MARKEROPS_BASE object.
 -- @param #MARKEROPS_BASE self
 -- @param #string Tagname Name to identify us from the event text.
 -- @param #table Keywords Table of keywords  recognized from the event text.
+-- @param #boolean Casesensitive (Optional) Switch case sensitive identification of Tagname. Defaults to true.
 -- @return #MARKEROPS_BASE self
-function MARKEROPS_BASE:New(Tagname,Keywords)
+function MARKEROPS_BASE:New(Tagname,Keywords,Casesensitive)
    -- Inherit FSM
   local self=BASE:Inherit(self, FSM:New()) -- #MARKEROPS_BASE
   
@@ -61,6 +71,11 @@ function MARKEROPS_BASE:New(Tagname,Keywords)
   self.Tag = Tagname or "mytag"-- #string
   self.Keywords = Keywords or {} -- #table - might want to use lua regex here, too
   self.debug = false
+  self.Casesensitive = true
+  
+  if Casesensitive and Casesensitive == false then
+    self.Casesensitive = false
+  end
   
   -----------------------
   --- FSM Transitions ---
@@ -99,6 +114,8 @@ function MARKEROPS_BASE:New(Tagname,Keywords)
    -- @param #string Text The text on the marker
    -- @param #table Keywords Table of matching keywords found in the Event text
    -- @param Core.Point#COORDINATE Coord Coordinate of the marker.
+   -- @param #number MarkerID Id of this marker
+   -- @param #number CoalitionNumber Coalition of the marker creator
    
    --- On after "MarkChanged" event. Triggered when a Marker is changed on the F10 map.
    -- @function [parent=#MARKEROPS_BASE] OnAfterMarkChanged
@@ -109,7 +126,9 @@ function MARKEROPS_BASE:New(Tagname,Keywords)
    -- @param #string Text The text on the marker
    -- @param #table Keywords Table of matching keywords found in the Event text
    -- @param Core.Point#COORDINATE Coord Coordinate of the marker.
-  
+   -- @param #number MarkerID Id of this marker
+   -- @param #number CoalitionNumber Coalition of the marker creator
+
    --- On after "MarkDeleted" event. Triggered when a Marker is deleted from the F10 map.
    -- @function [parent=#MARKEROPS_BASE] OnAfterMarkDeleted
    -- @param #MARKEROPS_BASE self
@@ -117,13 +136,13 @@ function MARKEROPS_BASE:New(Tagname,Keywords)
    -- @param #string Event The Event called
    -- @param #string To The To state
    
-      --- "Stop" trigger. Used to stop the function an unhandle events
+   --- "Stop" trigger. Used to stop the function an unhandle events
    -- @function [parent=#MARKEROPS_BASE] Stop
 
 end
 
 --- (internal) Handle events.
--- @param #MARKEROPS self
+-- @param #MARKEROPS_BASE self
 -- @param Core.Event#EVENTDATA Event
 function MARKEROPS_BASE:OnEventMark(Event)
   self:T({Event})
@@ -139,29 +158,30 @@ function MARKEROPS_BASE:OnEventMark(Event)
       local text = tostring(Event.text)
       local m = MESSAGE:New(string.format("Mark added at %s with text: %s",coordtext,text),10,"Info",false):ToAll()
     end
+    local coalition = Event.MarkCoalition
     -- decision
     if Event.id==world.event.S_EVENT_MARK_ADDED then
-      self:T({event="S_EVENT_MARK_ADDED", carrier=self.groupname, vec3=Event.pos})
+      self:T({event="S_EVENT_MARK_ADDED", carrier=Event.IniGroupName, vec3=Event.pos})
       -- Handle event
       local Eventtext = tostring(Event.text)
       if Eventtext~=nil then
         if self:_MatchTag(Eventtext) then
          local matchtable = self:_MatchKeywords(Eventtext)
-         self:MarkAdded(Eventtext,matchtable,coord)
+         self:MarkAdded(Eventtext,matchtable,coord,Event.idx,coalition)
         end
       end
     elseif Event.id==world.event.S_EVENT_MARK_CHANGE then
-      self:T({event="S_EVENT_MARK_CHANGE", carrier=self.groupname, vec3=Event.pos})
+      self:T({event="S_EVENT_MARK_CHANGE", carrier=Event.IniGroupName, vec3=Event.pos})
       -- Handle event.
       local Eventtext = tostring(Event.text)
       if Eventtext~=nil then
         if self:_MatchTag(Eventtext) then
          local matchtable = self:_MatchKeywords(Eventtext)
-         self:MarkChanged(Eventtext,matchtable,coord)
+         self:MarkChanged(Eventtext,matchtable,coord,Event.idx,coalition)
         end
       end
     elseif Event.id==world.event.S_EVENT_MARK_REMOVED then
-      self:T({event="S_EVENT_MARK_REMOVED", carrier=self.groupname, vec3=Event.pos})
+      self:T({event="S_EVENT_MARK_REMOVED", carrier=Event.IniGroupName, vec3=Event.pos})
       -- Hande event.
       local Eventtext = tostring(Event.text)
       if Eventtext~=nil then
@@ -173,20 +193,27 @@ function MARKEROPS_BASE:OnEventMark(Event)
 end
 
 --- (internal) Match tag.
--- @param #MARKEROPS self
+-- @param #MARKEROPS_BASE self
 -- @param #string Eventtext Text added to the marker.
 -- @return #boolean
 function MARKEROPS_BASE:_MatchTag(Eventtext)
   local matches = false
-  local type = string.lower(self.Tag) -- #string
-  if string.find(string.lower(Eventtext),type) then
-    matches = true --event text contains tag
+  if not self.Casesensitive then
+    local type = string.lower(self.Tag) -- #string
+    if string.find(string.lower(Eventtext),type) then
+      matches = true --event text contains tag
+    end
+  else
+    local type = self.Tag -- #string
+    if string.find(Eventtext,type) then
+      matches = true --event text contains tag
+    end
   end
   return matches
 end
 
 --- (internal) Match keywords table.
--- @param #MARKEROPS self
+-- @param #MARKEROPS_BASE self
 -- @param #string Eventtext Text added to the marker.
 -- @return #table
 function MARKEROPS_BASE:_MatchKeywords(Eventtext)
@@ -207,8 +234,10 @@ end
  -- @param #string To The To state
  -- @param #string Text The text on the marker
  -- @param #table Keywords Table of matching keywords found in the Event text
+ -- @param #number MarkerID Id of this marker
+ -- @param #number CoalitionNumber Coalition of the marker creator
  -- @param Core.Point#COORDINATE Coord Coordinate of the marker.
-function MARKEROPS_BASE:onbeforeMarkAdded(From,Event,To,Text,Keywords,Coord)
+function MARKEROPS_BASE:onbeforeMarkAdded(From,Event,To,Text,Keywords,Coord,MarkerID,CoalitionNumber)
   self:T({self.lid,From,Event,To,Text,Keywords,Coord:ToStringLLDDM()})
 end
 
@@ -219,8 +248,10 @@ end
  -- @param #string To The To state
  -- @param #string Text The text on the marker
  -- @param #table Keywords Table of matching keywords found in the Event text
+ -- @param #number MarkerID Id of this marker
+ -- @param #number CoalitionNumber Coalition of the marker creator
  -- @param Core.Point#COORDINATE Coord Coordinate of the marker.
-function MARKEROPS_BASE:onbeforeMarkChanged(From,Event,To,Text,Keywords,Coord)
+function MARKEROPS_BASE:onbeforeMarkChanged(From,Event,To,Text,Keywords,Coord,MarkerID,CoalitionNumber)
   self:T({self.lid,From,Event,To,Text,Keywords,Coord:ToStringLLDDM()})
 end
 

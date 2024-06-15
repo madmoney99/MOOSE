@@ -26,6 +26,7 @@
 -- @field #table filterCategoryGroup Filter for group categories.
 -- @field Core.Set#SET_ZONE acceptzoneset Set of accept zones. If defined, only contacts in these zones are considered.
 -- @field Core.Set#SET_ZONE rejectzoneset Set of reject zones. Contacts in these zones are not considered, even if they are in accept zones.
+-- @field Core.Set#SET_ZONE conflictzoneset Set of conflict zones. Contacts in these zones are considered, even if they are not in accept zones or if they are in reject zones.
 -- @field #table Contacts Table of detected items.
 -- @field #table ContactsLost Table of lost detected items.
 -- @field #table ContactsUnknown Table of new detected items.
@@ -98,6 +99,7 @@ INTEL = {
   clusterradius   = 15000,
   clusteranalysis =  true,
   clustermarkers  = false,
+  clusterarrows   = false,
   prediction      =   300,
   detectStatics   = false,
 }
@@ -158,13 +160,12 @@ INTEL.Ctype={
 
 --- INTEL class version.
 -- @field #string version
-INTEL.version="0.3.3"
+INTEL.version="0.3.6"
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- ToDo list
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
--- TODO: Make forget times user inpupt. Currently these are hard coded.
 -- TODO: Add min cluster size. Only create new clusters if they have a certain group size.
 -- TODO: process detected set asynchroniously for better performance.
 -- DONE: Add statics.
@@ -265,6 +266,7 @@ function INTEL:New(DetectionSet, Coalition, Alias)
   self:SetForgetTime()
   self:SetAcceptZones()
   self:SetRejectZones()
+  self:SetConflictZones()
 
   ------------------------
   --- Pseudo Functions ---
@@ -415,7 +417,7 @@ function INTEL:RemoveAcceptZone(AcceptZone)
 end
 
 --- Set reject zones. Contacts detected in this/these zone(s) are rejected and not reported by the detection.
--- Note that reject zones overrule accept zones, i.e. if a unit is inside and accept zone and inside a reject zone, it is rejected.
+-- Note that reject zones overrule accept zones, i.e. if a unit is inside an accept zone and inside a reject zone, it is rejected.
 -- @param #INTEL self
 -- @param Core.Set#SET_ZONE RejectZoneSet Set of reject zone(s).
 -- @return #INTEL self
@@ -425,7 +427,7 @@ function INTEL:SetRejectZones(RejectZoneSet)
 end
 
 --- Add a reject zone. Contacts detected in this zone are rejected and not reported by the detection.
--- Note that reject zones overrule accept zones, i.e. if a unit is inside and accept zone and inside a reject zone, it is rejected.
+-- Note that reject zones overrule accept zones, i.e. if a unit is inside an accept zone and inside a reject zone, it is rejected.
 -- @param #INTEL self
 -- @param Core.Zone#ZONE RejectZone Add a zone to the reject zone set.
 -- @return #INTEL self
@@ -440,6 +442,36 @@ end
 -- @return #INTEL self
 function INTEL:RemoveRejectZone(RejectZone)
   self.rejectzoneset:Remove(RejectZone:GetName(), true)
+  return self
+end
+
+--- Set conflict zones. Contacts detected in this/these zone(s) are reported by the detection.
+-- Note that conflict zones overrule all other zones, i.e. if a unit is outside of an accept zone and inside a reject zone, it is still reported if inside a conflict zone.
+-- @param #INTEL self
+-- @param Core.Set#SET_ZONE ConflictZoneSet Set of conflict zone(s).
+-- @return #INTEL self
+function INTEL:SetConflictZones(ConflictZoneSet)
+  self.conflictzoneset=ConflictZoneSet or SET_ZONE:New()
+  return self
+end
+
+--- Add a conflict zone. Contacts detected in this zone are conflicted and not reported by the detection.
+-- Note that conflict zones overrule all other zones, i.e. if a unit is outside of an accept zone and inside a reject zone, it is still reported if inside a conflict zone.
+-- @param #INTEL self
+-- @param Core.Zone#ZONE ConflictZone Add a zone to the conflict zone set.
+-- @return #INTEL self
+function INTEL:AddConflictZone(ConflictZone)
+  self.conflictzoneset:AddZone(ConflictZone)
+  return self
+end
+
+--- Remove a conflict zone from the conflict zone set.
+-- Note that conflict zones overrule all other zones, i.e. if a unit is outside of an accept zone and inside a reject zone, it is still reported if inside a conflict zone.
+-- @param #INTEL self
+-- @param Core.Zone#ZONE ConflictZone Remove a zone from the conflict zone set.
+-- @return #INTEL self
+function INTEL:RemoveConflictZone(ConflictZone)
+  self.conflictzoneset:Remove(ConflictZone:GetName(), true)
   return self
 end
 
@@ -477,6 +509,33 @@ function INTEL:SetFilterCategory(Categories)
   end
   self:T(self.lid..text)
 
+  return self
+end
+
+--- Method to make the radar detection less accurate, e.g. for WWII scenarios.
+-- @param #INTEL self
+-- @param #number minheight Minimum flight height to be detected, in meters AGL (above ground)
+-- @param #number thresheight Threshold to escape the radar if flying below minheight, defaults to 90 (90% escape chance)
+-- @param #number thresblur Threshold to be detected by the radar overall, defaults to 85 (85% chance to be found)
+-- @param #number closing Closing-in in km - the limit of km from which on it becomes increasingly difficult to escape radar detection if flying towards the radar position. Should be about 1/3 of the radar detection radius in kilometers, defaults to 20.
+-- @return #INTEL self
+function INTEL:SetRadarBlur(minheight,thresheight,thresblur,closing)
+  self.RadarBlur = true
+  self.RadarBlurMinHeight = minheight or 250 -- meters
+  self.RadarBlurThresHeight = thresheight or 90 -- 10% chance to find a low flying group
+  self.RadarBlurThresBlur = thresblur or 85 -- 25% chance to escape the radar overall
+  self.RadarBlurClosing = closing or 20 -- 20km
+  self.RadarBlurClosingSquare = self.RadarBlurClosing * self.RadarBlurClosing 
+  return self
+end
+
+--- Set the accept range in kilometers from each of the recce. Only object closer than this range will be detected.
+-- @param #INTEL self
+-- @param #number Range Range in kilometers
+-- @return #INTEL self
+function INTEL:SetAcceptRange(Range)
+  self.RadarAcceptRange = true
+  self.RadarAcceptRangeKilometers = Range or 75
   return self
 end
 
@@ -519,7 +578,7 @@ function INTEL:AddAgent(AgentGroup)
   end
 
   -- Add to detection set.
-  self.detectionset:AddGroup(AgentGroup)
+  self.detectionset:AddGroup(AgentGroup,true)
   return self
 end
 
@@ -528,10 +587,12 @@ end
 -- @param #INTEL self
 -- @param #boolean Switch If true, enable cluster analysis.
 -- @param #boolean Markers If true, place markers on F10 map.
+-- @param #boolean Arrows If true, draws arrows on F10 map.
 -- @return #INTEL self
-function INTEL:SetClusterAnalysis(Switch, Markers)
+function INTEL:SetClusterAnalysis(Switch, Markers, Arrows)
   self.clusteranalysis=Switch
   self.clustermarkers=Markers
+  self.clusterarrows=Arrows
   return self
 end
 
@@ -777,7 +838,19 @@ function INTEL:UpdateIntel()
   local remove={}
   for unitname,_unit in pairs(DetectedUnits) do
     local unit=_unit --Wrapper.Unit#UNIT
-
+    
+    local inconflictzone=false
+    -- Check if unit is in any of the conflict zones.
+    if self.conflictzoneset:Count()>0 then
+      for _,_zone in pairs(self.conflictzoneset.Set) do
+        local zone=_zone --Core.Zone#ZONE
+        if unit:IsInZone(zone) then
+          inconflictzone=true
+          break
+        end
+      end
+    end
+    
     -- Check if unit is in any of the accept zones.
     if self.acceptzoneset:Count()>0 then
       local inzone=false
@@ -790,7 +863,7 @@ function INTEL:UpdateIntel()
       end
 
       -- Unit is not in accept zone ==> remove!
-      if not inzone then
+      if (not inzone) and (not inconflictzone) then
         table.insert(remove, unitname)
       end
     end
@@ -807,13 +880,13 @@ function INTEL:UpdateIntel()
       end
 
       -- Unit is inside a reject zone ==> remove!
-      if inzone then
+      if inzone and (not inconflictzone) then
         table.insert(remove, unitname)
       end
     end
 
-    -- Filter unit categories.
-    if #self.filterCategory>0 then
+    -- Filter unit categories. Added check that we have a UNIT and not a STATIC object because :GetUnitCategory() is only available for units.
+    if #self.filterCategory>0 and unit:IsInstanceOf("UNIT") then
       local unitcategory=unit:GetUnitCategory()
       local keepit=false
       for _,filtercategory in pairs(self.filterCategory) do
@@ -1033,8 +1106,8 @@ function INTEL:CreateDetectedItems(DetectedGroups, DetectedStatics, RecceDetecti
   return self
 end
 
---- (Internal) Return the detected target groups of the controllable as a @{SET_GROUP}.
--- The optional parametes specify the detection methods that can be applied.
+--- (Internal) Return the detected target groups of the controllable as a @{Core.Set#SET_GROUP}.
+-- The optional parameters specify the detection methods that can be applied.
 -- If no detection method is given, the detection will use all the available methods by default.
 -- @param #INTEL self
 -- @param Wrapper.Unit#UNIT Unit The unit detecting.
@@ -1050,6 +1123,7 @@ function INTEL:GetDetectedUnits(Unit, DetectedUnits, RecceDetecting, DetectVisua
 
   -- Get detected DCS units.
   local reccename = Unit:GetName()
+
   local detectedtargets=Unit:GetDetectedTargets(DetectVisual, DetectOptical, DetectRadar, DetectIRST, DetectRWR, DetectDLINK)
 
   for DetectionObjectID, Detection in pairs(detectedtargets or {}) do
@@ -1068,17 +1142,55 @@ function INTEL:GetDetectedUnits(Unit, DetectedUnits, RecceDetecting, DetectVisua
       if status then
 
         local unit=UNIT:FindByName(name)
-
+ 
         if unit and unit:IsAlive() then
-          DetectedUnits[name]=unit
-          RecceDetecting[name]=reccename
-          self:T(string.format("Unit %s detect by %s", name, reccename))
-        else
-          local static=STATIC:FindByName(name, false)
-          if static then
-            --env.info("FF found static "..name)
-            DetectedUnits[name]=static
+          local DetectionAccepted = true
+          
+          if self.RadarAcceptRange then
+            local reccecoord = Unit:GetCoordinate()
+            local coord = unit:GetCoordinate()
+            local dist = math.floor(coord:Get2DDistance(reccecoord)/1000) -- km
+            if dist > self.RadarAcceptRangeKilometers then DetectionAccepted = false end
+          end
+          
+          if self.RadarBlur then
+            local reccecoord = Unit:GetCoordinate()
+            local coord = unit:GetCoordinate()
+            local dist = math.floor(coord:Get2DDistance(reccecoord)/1000) -- km
+            local AGL = unit:GetAltitude(true)
+            local minheight = self.RadarBlurMinHeight or 250 -- meters
+            local thresheight = self.RadarBlurThresHeight or 90 -- 10% chance to find a low flying group
+            local thresblur = self.RadarBlurThresBlur or 85 -- 25% chance to escape the radar overall
+            --local dist = math.floor(Distance)
+            if dist <= self.RadarBlurClosing  then
+              thresheight = (((dist*dist)/self.RadarBlurClosingSquare)*thresheight)
+              thresblur = (((dist*dist)/self.RadarBlurClosingSquare)*thresblur)
+            end
+            local fheight = math.floor(math.random(1,10000)/100)
+            local fblur = math.floor(math.random(1,10000)/100)
+            if fblur > thresblur then DetectionAccepted = false end
+            if AGL <= minheight and fheight < thresheight then DetectionAccepted = false end
+            if self.debug or self.verbose > 1 then
+              MESSAGE:New("Radar Blur",10):ToLogIf(self.debug):ToAllIf(self.verbose>1)      
+              MESSAGE:New("Unit "..name.." is at "..math.floor(AGL).."m. Distance "..math.floor(dist).."km.",10):ToLogIf(self.debug):ToAllIf(self.verbose>1)
+              MESSAGE:New(string.format("fheight = %d/%d | fblur = %d/%d",fheight,thresheight,fblur,thresblur),10):ToLogIf(self.debug):ToAllIf(self.verbose>1)
+              MESSAGE:New("Detection Accepted = "..tostring(DetectionAccepted),10):ToLogIf(self.debug):ToAllIf(self.verbose>1)
+            end
+          end
+           
+          if DetectionAccepted then
+            DetectedUnits[name]=unit
             RecceDetecting[name]=reccename
+            self:T(string.format("Unit %s detect by %s", name, reccename))
+          end
+        else
+          if self.detectStatics then
+            local static=STATIC:FindByName(name, false)
+            if static then
+              --env.info("FF found static "..name)
+              DetectedUnits[name]=static
+              RecceDetecting[name]=reccename
+            end
           end
         end
 
@@ -1088,7 +1200,6 @@ function INTEL:GetDetectedUnits(Unit, DetectedUnits, RecceDetecting, DetectVisua
       end
     end
   end
-
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1450,6 +1561,9 @@ function INTEL:PaintPicture()
         self:AddContactToCluster(contact, cluster)
 
       else
+      
+        -- Debug info.
+        self:T(self.lid..string.format("Paint Picture: contact %s has no closest cluster ==> Create new cluster", contact.groupname))      
 
         -- Create a brand new cluster.
         local newcluster=self:_CreateClusterFromContact(contact)
@@ -1680,8 +1794,8 @@ function INTEL:CalcClusterDirection(cluster)
   -- Second group is going East, i.e. heading 270
   -- Total is 360/2=180, i.e. South!
   -- It should not go anywhere as the two movements cancel each other.
-  -- Correct, edge case for N=2^x, but when 2 pairs of groups drive in exact opposite directions, the cluster will split at some point?
-  -- maybe add the speed as weight to get a weighted factor
+  -- Apple - Correct, edge case for N=2^x, but when 2 pairs of groups drive in exact opposite directions, the cluster will split at some point?
+  -- maybe add the speed as weight to get a weighted factor:
 
   if n==0 then
     return 0
@@ -1760,7 +1874,7 @@ function INTEL:CalcClusterFuturePosition(cluster, seconds)
   local futureposition=COORDINATE:NewFromVec3(Vec3)
 
   -- Create an arrow pointing in the direction of the movement.
-  if self.clustermarkers and self.verbose>1 then
+  if self.clustermarkers and self.clusterarrows then
     if cluster.markerID then
       COORDINATE:RemoveMark(cluster.markerID)
     end
@@ -1814,13 +1928,13 @@ function INTEL:IsContactConnectedToCluster(contact, cluster)
       --local dist=Contact.position:Get2DDistance(contact.position)
       local dist=Contact.position:DistanceFromPointVec2(contact.position)
 
-      -- AIR - check for spatial proximity
-      local airprox = false
+      -- AIR - check for spatial proximity (corrected because airprox was always false for ctype~=INTEL.Ctype.AIRCRAFT)
+      local airprox = true
       if contact.ctype == INTEL.Ctype.AIRCRAFT then
        self:T(string.format("Cluster Alt=%d | Contact Alt=%d",cluster.altitude,contact.altitude))
        local adist = math.abs(cluster.altitude - contact.altitude)
-       if adist < UTILS.FeetToMeters(10000) then -- limit to 10kft
-        airprox = true
+       if adist > UTILS.FeetToMeters(10000) then -- limit to 10kft
+        airprox = false
        end
       end
 
@@ -1900,17 +2014,17 @@ function INTEL:_GetClosestClusterOfContact(Contact)
 
       local dist=self:_GetDistContactToCluster(Contact, cluster)
 
-      -- AIR - check for spatial proximity
-      local airprox = false
+      -- AIR - check for spatial proximity (ff: Changed because airprox was always false for ctype~=AIRCRAFT!)
+      local airprox=true
       if Contact.ctype == INTEL.Ctype.AIRCRAFT then
-       if not cluster.altitude then
-        cluster.altitude = self:GetClusterAltitude(cluster,true)
-       end
-       local adist = math.abs(cluster.altitude - Contact.altitude)
-       self:T(string.format("Cluster Alt=%d | Contact Alt=%d",cluster.altitude,Contact.altitude))
-       if adist < UTILS.FeetToMeters(10000) then
-        airprox = true
-       end
+        if not cluster.altitude then
+          cluster.altitude = self:GetClusterAltitude(cluster,true)
+        end
+        local adist = math.abs(cluster.altitude - Contact.altitude)
+         self:T(string.format("Cluster Alt=%d | Contact Alt=%d",cluster.altitude,Contact.altitude))
+        if adist > UTILS.FeetToMeters(10000) then
+          airprox = false
+        end
       end
 
       if dist<distmin and airprox then
@@ -2148,6 +2262,27 @@ function INTEL:UpdateClusterMarker(cluster)
   return self
 end
 
+--- Get the contact with the highest threat level from the cluster.
+-- @param #INTEL self
+-- @param #INTEL.Cluster Cluster The cluster.
+-- @return #INTEL.Contact the contact or nil if none
+function INTEL:GetHighestThreatContact(Cluster)
+  local threatlevel=-1
+  local rcontact = nil
+  
+  for _,_contact in pairs(Cluster.Contacts) do
+
+    local contact=_contact --Ops.Intel#INTEL.Contact
+
+    if contact.threatlevel>threatlevel then
+      threatlevel=contact.threatlevel
+      rcontact = contact
+    end
+
+  end
+  return rcontact
+end
+
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2177,8 +2312,8 @@ end
 -- @field #string alias Alias name for logging.
 -- @field #number cachetime Number of seconds to keep an object.
 -- @field #number interval Number of seconds between collection runs.
--- @field #table contacts Table of Ops.Intelligence#INTEL.Contact contacts.
--- @field #table clusters Table of Ops.Intelligence#INTEL.Cluster clusters.
+-- @field #table contacts Table of Ops.Intel#INTEL.Contact contacts.
+-- @field #table clusters Table of Ops.Intel#INTEL.Cluster clusters.
 -- @field #table contactcoords Table of contacts' Core.Point#COORDINATE objects.
 -- @extends Core.Fsm#FSM
 
@@ -2202,7 +2337,7 @@ INTEL_DLINK.version = "0.0.1"
 
 --- Function to instantiate a new object
 -- @param #INTEL_DLINK self
--- @param #table Intels Table of Ops.Intelligence#INTEL objects.
+-- @param #table Intels Table of Ops.Intel#INTEL objects.
 -- @param #string Alias (optional) Name of this instance. Default "SPECTRE"
 -- @param #number Interval (optional) When to query #INTEL objects for detected items (default 20 seconds).
 -- @param #number Cachetime (optional) How long to cache detected items (default 300 seconds).
@@ -2314,7 +2449,7 @@ end
 
 --- Function to add an #INTEL object to the aggregator
 -- @param #INTEL_DLINK self
--- @param Ops.Intelligence#INTEL Intel the #INTEL object to add
+-- @param Ops.Intel#INTEL Intel the #INTEL object to add
 -- @return #INTEL_DLINK self
 function INTEL_DLINK:AddIntel(Intel)
    self:T(self.lid .. "AddIntel")

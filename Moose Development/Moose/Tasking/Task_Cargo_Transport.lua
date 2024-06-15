@@ -1,4 +1,4 @@
---- **Tasking** -- Models tasks for players to transport cargo.
+--- **Tasking** - Models tasks for players to transport cargo.
 -- 
 -- **Specific features:**
 -- 
@@ -41,6 +41,11 @@
 --   * Switch between coordinate formats used in messages: BR, BRA, LL DMS, LL DDM, MGRS.
 --   * Different settings modes for A2G and A2A operations.
 --   * Various other options.
+--
+-- # Developer Note
+-- 
+-- Note while this class still works, it is no longer supported as the original author stopped active development of MOOSE
+-- Therefore, this class is considered to be deprecated
 --
 -- ===
 -- 
@@ -118,7 +123,7 @@ do -- TASK_CARGO_TRANSPORT
   --     -- The cargoset "CargoSet" will embed all defined cargo of type "Pilots" (prefix) into its set.
   --     local CargoGroup = CARGO_GROUP:New( PilotGroup, "Cargo", "Engineer Team 1", 500 )
   -- 
-  -- What is also needed, is to have a set of Core.Groups defined that contains the clients of the players.
+  -- What is also needed, is to have a set of @{Wrapper.Group}s defined that contains the clients of the players.
   -- 
   --     -- Allocate the Transport, which are the helicopter to retrieve the pilot, that can be manned by players.
   --     local GroupSet = SET_GROUP:New():FilterPrefixes( "Transport" ):FilterStart()

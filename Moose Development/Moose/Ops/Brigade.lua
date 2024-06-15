@@ -10,7 +10,7 @@
 --
 -- ## Example Missions:
 --
--- Demo missions can be found on [github](https://github.com/FlightControl-Master/MOOSE_MISSIONS/tree/develop/OPS%20-%20Brigade).
+-- Demo missions can be found on [github](https://github.com/FlightControl-Master/MOOSE_MISSIONS/tree/develop/Ops/Brigade).
 -- 
 -- ===
 --
@@ -92,7 +92,15 @@ function BRIGADE:New(WarehouseName, BrigadeName)
   
   -- Defaults
   self:SetRetreatZones()
-
+  
+  -- Turn ship into NAVYGROUP.
+  if self:IsShip() then
+    local wh=self.warehouse --Wrapper.Unit#UNIT
+    local group=wh:GetGroup()
+    self.warehouseOpsGroup=NAVYGROUP:New(group) --Ops.NavyGroup#NAVYGROUP
+    self.warehouseOpsElement=self.warehouseOpsGroup:GetElementByName(wh:GetName())
+  end
+  
   -- Add FSM transitions.
   --                 From State  -->   Event         -->      To State
   self:AddTransition("*",             "ArmyOnMission",       "*")           -- An ARMYGROUP was send on a Mission (AUFTRAG).
@@ -305,8 +313,8 @@ end
 --   
 --              local Path = FilePath or "C:\\Users\\<yourname>\\Saved Games\\DCS\\Missions\\" -- example path
 --              local BlueOpsFilename = BlueFileName or "ExamplePlatoonSave.csv" -- example filename 
---              local BlueSaveOps = SET_GROUP:New():FilterCoalitions("blue"):FilterPrefixes("AID"):FilterCategoryGround():FilterOnce()
---              UTILS.SaveSetOfGroups(BlueSaveOps,Path,BlueOpsFilename)
+--              local BlueSaveOps = SET_OPSGROUP:New():FilterCoalitions("blue"):FilterCategoryGround():FilterOnce()
+--              UTILS.SaveSetOfOpsGroups(BlueSaveOps,Path,BlueOpsFilename)
 --          
 -- where Path and Filename are strings, as chosen by you.
 -- You can then load back the assets at the start of your next mission run. Be aware that it takes a couple of seconds for the 
@@ -316,7 +324,7 @@ end
 --              local Path = FilePath or "C:\\Users\\<yourname>\\Saved Games\\DCS\\Missions\\" -- example path
 --              local BlueOpsFilename = BlueFileName or "ExamplePlatoonSave.csv" -- example filename  
 --              if UTILS.CheckFileExists(Path,BlueOpsFilename) then
---                local loadback = UTILS.LoadSetOfGroups(Path,BlueOpsFilename,false)
+--                local loadback = UTILS.LoadSetOfOpsGroups(Path,BlueOpsFilename,false)
 --                for _,_platoondata in pairs (loadback) do
 --                  local groupname = _platoondata.groupname -- #string
 --                  local coordinate = _platoondata.coordinate -- Core.Point#COORDINATE
@@ -564,9 +572,9 @@ function BRIGADE:onafterStatus(From, Event, To)
     self:I(self.lid..text)
   end
   
-  -------------------
+  ---------------------
   -- Refuelling Info --
-  -------------------
+  ---------------------
   if self.verbose>=4 then
     local text="Refuelling Zones:"
     for i,_refuellingzone in pairs(self.refuellingZones) do
@@ -575,7 +583,20 @@ function BRIGADE:onafterStatus(From, Event, To)
       text=text..string.format("\n* %s: Mission status=%s, suppliers=%d", refuellingzone.zone:GetName(), refuellingzone.mission:GetState(), refuellingzone.mission:CountOpsGroups())      
     end
     self:I(self.lid..text)
-  end  
+  end
+  
+  ----------------
+  -- Asset Info --
+  ----------------
+  if self.verbose>=5 then
+    local text="Assets in stock:"
+    for i,_asset in pairs(self.stock) do
+      local asset=_asset --Functional.Warehouse#WAREHOUSE.Assetitem
+      -- Info text.
+      text=text..string.format("\n* %s: spawned=%s", asset.spawngroupname, tostring(asset.spawned))      
+    end
+    self:I(self.lid..text)
+  end    
 
 end
 

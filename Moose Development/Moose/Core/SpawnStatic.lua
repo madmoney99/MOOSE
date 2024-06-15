@@ -1,36 +1,36 @@
 --- **Core** - Spawn statics.
---  
+--
 -- ===
--- 
+--
 -- ## Features:
--- 
+--
 --   * Spawn new statics from a static already defined in the mission editor.
 --   * Spawn new statics from a given template.
 --   * Spawn new statics from a given type.
 --   * Spawn with a custom heading and location.
 --   * Spawn within a zone.
 --   * Spawn statics linked to units, .e.g on aircraft carriers.
--- 
--- ===
--- 
--- # Demo Missions
--- 
--- ## [SPAWNSTATIC Demo Missions](https://github.com/FlightControl-Master/MOOSE_MISSIONS/tree/master/SPS%20-%20Spawning%20Statics)
 --
--- 
 -- ===
--- 
+--
+-- # Demo Missions
+--
+-- ## [SPAWNSTATIC Demo Missions](https://github.com/FlightControl-Master/MOOSE_Demos/tree/master/Core/SpawnStatic)
+--
+--
+-- ===
+--
 -- # YouTube Channel
--- 
--- ## [SPAWNSTATIC YouTube Channel]() [No videos yet!]
--- 
+--
+-- ## No videos yet!
+--
 -- ===
--- 
+--
 -- ### Author: **FlightControl**
 -- ### Contributions: **funkyfranky**
--- 
+--
 -- ===
--- 
+--
 -- @module Core.SpawnStatic
 -- @image Core_Spawnstatic.JPG
 
@@ -57,38 +57,38 @@
 -- @extends Core.Base#BASE
 
 
---- Allows to spawn dynamically new @{Static}s into your mission.
--- 
--- Through creating a copy of an existing static object template as defined in the Mission Editor (ME), SPAWNSTATIC can retireve the properties of the defined static object template (like type, category etc), 
+--- Allows to spawn dynamically new @{Wrapper.Static}s into your mission.
+--
+-- Through creating a copy of an existing static object template as defined in the Mission Editor (ME), SPAWNSTATIC can retireve the properties of the defined static object template (like type, category etc),
 -- and "copy" these properties to create a new static object and place it at the desired coordinate.
--- 
--- New spawned @{Static}s get **the same name** as the name of the template Static, or gets the given name when a new name is provided at the Spawn method.  
--- By default, spawned @{Static}s will follow a naming convention at run-time:
--- 
---   * Spawned @{Static}s will have the name _StaticName_#_nnn_, where _StaticName_ is the name of the **Template Static**, and _nnn_ is a **counter from 0 to 99999**.
--- 
+--
+-- New spawned @{Wrapper.Static}s get **the same name** as the name of the template Static, or gets the given name when a new name is provided at the Spawn method.
+-- By default, spawned @{Wrapper.Static}s will follow a naming convention at run-time:
+--
+--   * Spawned @{Wrapper.Static}s will have the name _StaticName_#_nnn_, where _StaticName_ is the name of the **Template Static**, and _nnn_ is a **counter from 0 to 99999**.
+--
 -- # SPAWNSTATIC Constructors
--- 
+--
 -- Firstly, we need to create a SPAWNSTATIC object that will be used to spawn new statics into the mission. There are three ways to do this.
--- 
+--
 -- ## Use another Static
--- 
+--
 -- A new SPAWNSTATIC object can be created using another static by the @{#SPAWNSTATIC.NewFromStatic}() function. All parameters such as position, heading, country will be initialized
 -- from the static.
--- 
+--
 -- ## From a Template
--- 
+--
 -- A SPAWNSTATIC object can also be created from a template table using the @{#SPAWNSTATIC.NewFromTemplate}(SpawnTemplate, CountryID) function. All parameters are taken from the template.
--- 
+--
 -- ## From a Type
--- 
+--
 -- A very basic method is to create a SPAWNSTATIC object by just giving the type of the static. All parameters must be initialized from the InitXYZ functions described below. Otherwise default values
 -- are used. For example, if no spawn coordinate is given, the static will be created at the origin of the map.
--- 
+--
 -- # Setting Parameters
--- 
+--
 -- Parameters such as the spawn position, heading, country etc. can be set via :Init*XYZ* functions. Note that these functions must be given before the actual spawn command!
--- 
+--
 --   * @{#SPAWNSTATIC.InitCoordinate}(Coordinate) Sets the coordinate where the static is spawned. Statics are always spawnd on the ground.
 --   * @{#SPAWNSTATIC.InitHeading}(Heading) sets the orientation of the static.
 --   * @{#SPAWNSTATIC.InitLivery}(LiveryName) sets the livery of the static. Not all statics support this.
@@ -99,17 +99,17 @@
 --   * @{#SPAWNSTATIC.InitLinkToUnit}(Unit, OffsetX, OffsetY, OffsetAngle) links the static to a unit, e.g. to an aircraft carrier.
 --
 -- # Spawning the Statics
--- 
+--
 -- Once the SPAWNSTATIC object is created and parameters are initialized, the spawn command can be given. There are different methods where some can be used to directly set parameters
 -- such as position and heading.
--- 
+--
 --   * @{#SPAWNSTATIC.Spawn}(Heading, NewName) spawns the static with the set parameters. Optionally, heading and name can be given. The name **must be unique**!
 --   * @{#SPAWNSTATIC.SpawnFromCoordinate}(Coordinate, Heading, NewName) spawn the static at the given coordinate. Optionally, heading and name can be given. The name **must be unique**!
 --   * @{#SPAWNSTATIC.SpawnFromPointVec2}(PointVec2, Heading, NewName) spawns the static at a POINT_VEC2 coordinate. Optionally, heading and name can be given. The name **must be unique**!
---   * @{#SPAWNSTATIC.SpawnFromZone}(Zone, Heading, NewName) spawns the static at the center of a @{Zone}. Optionally, heading and name can be given. The name **must be unique**!
---  
+--   * @{#SPAWNSTATIC.SpawnFromZone}(Zone, Heading, NewName) spawns the static at the center of a @{Core.Zone}. Optionally, heading and name can be given. The name **must be unique**!
+--
 -- @field #SPAWNSTATIC SPAWNSTATIC
--- 
+--
 SPAWNSTATIC = {
   ClassName  = "SPAWNSTATIC",
   SpawnIndex = 0,
@@ -131,7 +131,7 @@ SPAWNSTATIC = {
 -- @field #number mass Cargo mass in kg.
 -- @field #boolean canCargo Static can be a cargo.
 
---- Creates the main object to spawn a @{Static} defined in the mission editor (ME).
+--- Creates the main object to spawn a @{Wrapper.Static} defined in the mission editor (ME).
 -- @param #SPAWNSTATIC self
 -- @param #string SpawnTemplateName Name of the static object in the ME. Each new static will have the name starting with this prefix.
 -- @param DCS#country.id SpawnCountryID (Optional) The ID of the country.
@@ -139,9 +139,9 @@ SPAWNSTATIC = {
 function SPAWNSTATIC:NewFromStatic(SpawnTemplateName, SpawnCountryID)
 
   local self = BASE:Inherit( self, BASE:New() ) -- #SPAWNSTATIC
-  
+
   local TemplateStatic, CoalitionID, CategoryID, CountryID = _DATABASE:GetStaticGroupTemplate(SpawnTemplateName)
-  
+
   if TemplateStatic then
     self.SpawnTemplatePrefix = SpawnTemplateName
     self.TemplateStaticUnit  = UTILS.DeepCopy(TemplateStatic.units[1])
@@ -158,7 +158,7 @@ function SPAWNSTATIC:NewFromStatic(SpawnTemplateName, SpawnCountryID)
   return self
 end
 
---- Creates the main object to spawn a @{Static} given a template table.
+--- Creates the main object to spawn a @{Wrapper.Static} given a template table.
 -- @param #SPAWNSTATIC self
 -- @param #table SpawnTemplate Template used for spawning.
 -- @param DCS#country.id CountryID The ID of the country. Default `country.id.USA`.
@@ -166,15 +166,15 @@ end
 function SPAWNSTATIC:NewFromTemplate(SpawnTemplate, CountryID)
 
   local self = BASE:Inherit( self, BASE:New() ) -- #SPAWNSTATIC
-  
+
   self.TemplateStaticUnit  = UTILS.DeepCopy(SpawnTemplate)
   self.SpawnTemplatePrefix = SpawnTemplate.name
   self.CountryID           = CountryID or country.id.USA
-  
+
   return self
 end
 
---- Creates the main object to spawn a @{Static} from a given type.
+--- Creates the main object to spawn a @{Wrapper.Static} from a given type.
 -- NOTE that you have to init many other parameters as spawn coordinate etc.
 -- @param #SPAWNSTATIC self
 -- @param #string StaticType Type of the static.
@@ -189,7 +189,7 @@ function SPAWNSTATIC:NewFromType(StaticType, StaticCategory, CountryID)
   self.InitStaticCategory=StaticCategory
   self.CountryID=CountryID or country.id.USA
   self.SpawnTemplatePrefix=self.InitStaticType
-  
+
   self.InitStaticCoordinate=COORDINATE:New(0, 0, 0)
   self.InitStaticHeading=0
 
@@ -275,7 +275,7 @@ end
 
 --- Initialize as dead.
 -- @param #SPAWNSTATIC self
--- @param #boolean IsCargo If true, this static is dead.
+-- @param #boolean IsDead If true, this static is dead.
 -- @return #SPAWNSTATIC self
 function SPAWNSTATIC:InitDead(IsDead)
   self.InitStaticDead=IsDead
@@ -291,7 +291,7 @@ function SPAWNSTATIC:InitCountry(CountryID)
   return self
 end
 
---- Initialize name prefix statics get. This will be appended by "#0001", "#0002" etc. 
+--- Initialize name prefix statics get. This will be appended by "#0001", "#0002" etc.
 -- @param #SPAWNSTATIC self
 -- @param #string NamePrefix Name prefix of statics spawned. Will append #0001, etc to the name.
 -- @return #SPAWNSTATIC self
@@ -327,16 +327,16 @@ function SPAWNSTATIC:Spawn(Heading, NewName)
   if Heading then
     self.InitStaticHeading=Heading
   end
-  
+
   if NewName then
     self.InitStaticName=NewName
   end
 
   return self:_SpawnStatic(self.TemplateStaticUnit, self.CountryID)
-  
+
 end
 
---- Creates a new @{Static} from a POINT_VEC2.
+--- Creates a new @{Wrapper.Static} from a POINT_VEC2.
 -- @param #SPAWNSTATIC self
 -- @param Core.Point#POINT_VEC2 PointVec2 The 2D coordinate where to spawn the static.
 -- @param #number Heading The heading of the static, which is a number in degrees from 0 to 360.
@@ -347,12 +347,12 @@ function SPAWNSTATIC:SpawnFromPointVec2(PointVec2, Heading, NewName)
   local vec2={x=PointVec2:GetX(), y=PointVec2:GetY()}
 
   local Coordinate=COORDINATE:NewFromVec2(vec2)
-  
+
   return self:SpawnFromCoordinate(Coordinate, Heading, NewName)
 end
 
 
---- Creates a new @{Static} from a COORDINATE.
+--- Creates a new @{Wrapper.Static} from a COORDINATE.
 -- @param #SPAWNSTATIC self
 -- @param Core.Point#COORDINATE Coordinate The 3D coordinate where to spawn the static.
 -- @param #number Heading (Optional) Heading The heading of the static in degrees. Default is 0 degrees.
@@ -362,11 +362,11 @@ function SPAWNSTATIC:SpawnFromCoordinate(Coordinate, Heading, NewName)
 
   -- Set up coordinate.
   self.InitStaticCoordinate=Coordinate
-  
+
   if Heading then
     self.InitStaticHeading=Heading
   end
-  
+
   if NewName then
     self.InitStaticName=NewName
   end
@@ -375,7 +375,7 @@ function SPAWNSTATIC:SpawnFromCoordinate(Coordinate, Heading, NewName)
 end
 
 
---- Creates a new @{Static} from a @{Zone}.
+--- Creates a new @{Wrapper.Static} from a @{Core.Zone}.
 -- @param #SPAWNSTATIC self
 -- @param Core.Zone#ZONE_BASE Zone The Zone where to spawn the static.
 -- @param #number Heading (Optional)The heading of the static in degrees. Default is the heading of the template.
@@ -385,7 +385,7 @@ function SPAWNSTATIC:SpawnFromZone(Zone, Heading, NewName)
 
   -- Spawn the new static at the center of the zone.
   local Static = self:SpawnFromPointVec2( Zone:GetPointVec2(), Heading, NewName )
-  
+
   return Static
 end
 
@@ -399,45 +399,45 @@ function SPAWNSTATIC:_SpawnStatic(Template, CountryID)
   Template=Template or {}
 
   local CountryID=CountryID or self.CountryID
-  
+
   if self.InitStaticType then
     Template.type=self.InitStaticType
   end
-  
+
   if self.InitStaticCategory then
     Template.category=self.InitStaticCategory
   end
-  
-  if self.InitStaticCoordinate then  
-    Template.x   = self.InitStaticCoordinate.x    
+
+  if self.InitStaticCoordinate then
+    Template.x   = self.InitStaticCoordinate.x
     Template.y   = self.InitStaticCoordinate.z
-    Template.alt = self.InitStaticCoordinate.y  
+    Template.alt = self.InitStaticCoordinate.y
   end
-  
+
   if self.InitStaticHeading then
-    Template.heading = math.rad(self.InitStaticHeading)  
+    Template.heading = math.rad(self.InitStaticHeading)
   end
 
   if self.InitStaticShape then
     Template.shape_name=self.InitStaticShape
   end
-  
+
   if self.InitStaticLivery then
     Template.livery_id=self.InitStaticLivery
   end
-  
+
   if self.InitStaticDead~=nil then
     Template.dead=self.InitStaticDead
   end
-  
+
   if self.InitStaticCargo~=nil then
     Template.canCargo=self.InitStaticCargo
   end
-  
+
   if self.InitStaticCargoMass~=nil then
     Template.mass=self.InitStaticCargoMass
   end
-  
+
   if self.InitLinkUnit then
     Template.linkUnit=self.InitLinkUnit:GetID()
     Template.linkOffset=true
@@ -446,52 +446,63 @@ function SPAWNSTATIC:_SpawnStatic(Template, CountryID)
     Template.offsets.x=self.InitOffsetX
     Template.offsets.angle=self.InitOffsetAngle and math.rad(self.InitOffsetAngle) or 0
   end
-  
+
   if self.InitFarp then
     Template.heliport_callsign_id = self.InitFarpCallsignID
     Template.heliport_frequency   = self.InitFarpFreq
     Template.heliport_modulation  = self.InitFarpModu
     Template.unitId=nil
   end
-  
+
   -- Increase spawn index counter.
   self.SpawnIndex = self.SpawnIndex + 1
-  
+
   -- Name of the spawned static.
   Template.name = self.InitStaticName or string.format("%s#%05d", self.SpawnTemplatePrefix, self.SpawnIndex)
 
   -- Add and register the new static.
   local mystatic=_DATABASE:AddStatic(Template.name)
-  
+
   -- Debug output.
   self:T(Template)
-  
+
   -- Add static to the game.
-  local Static=nil
-  
+  local Static=nil  --DCS#StaticObject
+
   if self.InitFarp then
-    
-    local TemplateGroup={}    
+
+    local TemplateGroup={}
     TemplateGroup.units={}
     TemplateGroup.units[1]=Template
-    
+
     TemplateGroup.visible=true
     TemplateGroup.hidden=false
     TemplateGroup.x=Template.x
     TemplateGroup.y=Template.y
     TemplateGroup.name=Template.name
 
-    self:T("Spawning FARP")        
+    self:T("Spawning FARP")
     self:T({Template=Template})
     self:T({TemplateGroup=TemplateGroup})
-    
+
     -- ED's dirty way to spawn FARPS.
     Static=coalition.addGroup(CountryID, -1, TemplateGroup)
+
+    -- Currently DCS 2.8 does not trigger birth events if FAPRS are spawned!
+    -- We create such an event. The airbase is registered in Core.Event
+    local Event = {
+      id = EVENTS.Birth,
+      time = timer.getTime(),
+      initiator = Static
+      }
+    -- Create BIRTH event.
+    world.onEvent(Event)
+
   else
-    self:T("Spawning Static")        
-    self:T2({Template=Template})  
+    self:T("Spawning Static")
+    self:T2({Template=Template})
     Static=coalition.addStaticObject(CountryID, Template)
   end
-    
+
   return mystatic
 end

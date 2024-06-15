@@ -1,4 +1,4 @@
---- **Functional** -- Keep airbases clean of crashing or colliding airplanes, and kill missiles when being fired at airbases.
+--- **Functional** - Keep airbases clean of crashing or colliding airplanes, and kill missiles when being fired at airbases.
 --
 -- ===
 --
@@ -14,7 +14,7 @@
 --
 -- ## Missions:
 --
--- [CLA - CleanUp Airbase](https://github.com/FlightControl-Master/MOOSE_MISSIONS/tree/master/CLA%20-%20CleanUp%20Airbase)
+-- [CLA - CleanUp Airbase](https://github.com/FlightControl-Master/MOOSE_MISSIONS/tree/master/Functional/CleanUp)
 --
 -- ===
 --

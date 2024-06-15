@@ -10,7 +10,7 @@
 --
 -- ## Example Missions:
 --
--- Demo missions can be found on [github](https://github.com/FlightControl-Master/MOOSE_MISSIONS/tree/develop/OPS%20-%20Airwing).
+-- Demo missions can be found on [github](https://github.com/FlightControl-Master/MOOSE_MISSIONS/tree/develop/Ops/Airwing).
 --
 -- ===
 --
@@ -34,14 +34,17 @@
 -- @field Core.Set#SET_ZONE zonesetCAP Set of CAP zones.
 -- @field Core.Set#SET_ZONE zonesetTANKER Set of TANKER zones.
 -- @field Core.Set#SET_ZONE zonesetAWACS Set of AWACS zones.
+-- @field Core.Set#SET_ZONE zonesetRECON Set of RECON zones. 
 -- @field #number nflightsCAP Number of CAP flights constantly in the air.
 -- @field #number nflightsAWACS Number of AWACS flights constantly in the air.
 -- @field #number nflightsTANKERboom Number of TANKER flights with BOOM constantly in the air.
 -- @field #number nflightsTANKERprobe Number of TANKER flights with PROBE constantly in the air.
 -- @field #number nflightsRescueHelo Number of Rescue helo flights constantly in the air.
+-- @field #number nflightsRecon Number of Recon flights constantly in the air.
 -- @field #table pointsCAP Table of CAP points.
 -- @field #table pointsTANKER Table of Tanker points.
 -- @field #table pointsAWACS Table of AWACS points.
+-- @field #table pointsRecon Table of RECON points.
 -- @field #boolean markpoints Display markers on the F10 map.
 -- @field Ops.Airboss#AIRBOSS airboss Airboss attached to this wing.
 --
@@ -51,7 +54,11 @@
 -- @field #string takeoffType Take of type.
 -- @field #boolean despawnAfterLanding Aircraft are despawned after landing.
 -- @field #boolean despawnAfterHolding Aircraft are despawned after holding.
---
+-- @field #boolean capOptionPatrolRaceTrack Use closer patrol race track or standard orbit auftrag.
+-- @field #number capFormation If capOptionPatrolRaceTrack is true, set the formation, also.
+-- @field #number capOptionVaryStartTime If set, vary mission start time for CAP missions generated random between capOptionVaryStartTime and capOptionVaryEndTime
+-- @field #number capOptionVaryEndTime If set, vary mission start time for CAP missions generated random between capOptionVaryStartTime and capOptionVaryEndTime
+-- 
 -- @extends Ops.Legion#LEGION
 
 --- *I fly because it releases my mind from the tyranny of petty things.* -- Antoine de Saint-Exupery
@@ -123,7 +130,12 @@ AIRWING = {
   pointsCAP      =    {},
   pointsTANKER   =    {},
   pointsAWACS    =    {},
+  pointsRecon    =    {},
   markpoints     =   false,
+  capOptionPatrolRaceTrack = false,
+  capFormation   =    nil,
+  capOptionVaryStartTime =    nil,
+  capOptionVaryEndTime =    nil,
 }
 
 --- Payload data.
@@ -175,7 +187,7 @@ AIRWING = {
 
 --- AIRWING class version.
 -- @field #string version
-AIRWING.version="0.9.2"
+AIRWING.version="0.9.5"
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- ToDo list
@@ -219,6 +231,7 @@ function AIRWING:New(warehousename, airwingname)
   -- Defaults:
   self.nflightsCAP=0
   self.nflightsAWACS=0
+  self.nflightsRecon=0
   self.nflightsTANKERboom=0
   self.nflightsTANKERprobe=0
   self.nflightsRecoveryTanker=0
@@ -422,6 +435,44 @@ function AIRWING:SetPayloadAmount(Payload, Navailable)
   return self
 end
 
+--- Increase or decrease the amount of available payloads. Unlimited playloads first need to be set to a limited number with the `SetPayloadAmount` function.
+-- @param #AIRWING self
+-- @param #AIRWING.Payload Payload The payload table created by the `:NewPayload` function.
+-- @param #number N Number of payloads to be added. Use negative number to decrease amount. Default 1.
+-- @return #AIRWING self
+function AIRWING:IncreasePayloadAmount(Payload, N)
+
+  N=N or 1
+  
+  if Payload and Payload.navail>=0 then
+  
+    -- Increase/decrease amount.
+    Payload.navail=Payload.navail+N
+  
+    -- Ensure playload does not drop below 0.
+    Payload.navail=math.max(Payload.navail, 0) 
+  
+  end
+  
+  return self
+end
+
+--- Get amount of payloads available for a given playload.
+-- @param #AIRWING self
+-- @param #AIRWING.Payload Payload The payload table created by the `:NewPayload` function.
+-- @return #number Number of payloads available. Unlimited payloads will return -1.
+function AIRWING:GetPayloadAmount(Payload)
+  return Payload.navail
+end
+
+--- Get capabilities of a given playload.
+-- @param #AIRWING self
+-- @param #AIRWING.Payload Payload The payload data table.
+-- @return #table Capabilities.
+function AIRWING:GetPayloadCapabilities(Payload)
+  return Payload.capabilities
+end
+
 --- Add a mission capability to an existing payload.
 -- @param #AIRWING self
 -- @param #AIRWING.Payload Payload The payload table to which the capability should be added.
@@ -486,7 +537,7 @@ function AIRWING:FetchPayloadFromStock(UnitType, MissionType, Payloads)
     if a and b then  -- I had the case that a or b were nil even though the self.payloads table was looking okay. Very strange! Seems to be solved by pre-selecting valid payloads.
       local performanceA=self:GetPayloadPeformance(a, MissionType)
       local performanceB=self:GetPayloadPeformance(b, MissionType)
-      return (performanceA>performanceB) or (performanceA==performanceB and a.unlimited==true) or (performanceA==performanceB and a.unlimited==true and b.unlimited==true and a.navail>b.navail)
+      return (performanceA>performanceB) or (performanceA==performanceB and a.unlimited==true and b.unlimited~=true) or (performanceA==performanceB and a.unlimited==true and b.unlimited==true and a.navail>b.navail)
     elseif not a then
       self:I(self.lid..string.format("FF ERROR in sortpayloads: a is nil"))
       return false
@@ -656,6 +707,35 @@ function AIRWING:SetNumberCAP(n)
   return self
 end
 
+--- Set CAP flight formation.
+-- @param #AIRWING self
+-- @param #number Formation Formation to take, e.g. ENUMS.Formation.FixedWing.Trail.Close, also see [Hoggit Wiki](https://wiki.hoggitworld.com/view/DCS_option_formation).
+-- @return #AIRWING self
+function AIRWING:SetCAPFormation(Formation)
+  self.capFormation = Formation
+  return self
+end
+
+--- Set CAP close race track.We'll utilize the AUFTRAG PatrolRaceTrack instead of a standard race track orbit task.
+-- @param #AIRWING self
+-- @param #boolean OnOff If true, switch this on, else switch off. Off by default.
+-- @return #AIRWING self
+function AIRWING:SetCapCloseRaceTrack(OnOff)
+  self.capOptionPatrolRaceTrack = OnOff
+  return self
+end
+
+--- Set CAP mission start to vary randomly between Start end End seconds.
+-- @param #AIRWING self
+-- @param #number Start
+-- @param #number End 
+-- @return #AIRWING self
+function AIRWING:SetCapStartTimeVariation(Start, End)
+  self.capOptionVaryStartTime = Start or 5
+  self.capOptionVaryEndTime = End or 60
+  return self
+end
+
 --- Set number of TANKER flights with Boom constantly in the air.
 -- @param #AIRWING self
 -- @param #number Nboom Number of flights. Default 1.
@@ -693,6 +773,15 @@ end
 -- @return #AIRWING self
 function AIRWING:SetNumberAWACS(n)
   self.nflightsAWACS=n or 1
+  return self
+end
+
+--- Set number of RECON flights constantly in the air.
+-- @param #AIRWING self
+-- @param #number n Number of flights. Default 1.
+-- @return #AIRWING self
+function AIRWING:SetNumberRecon(n)
+  self.nflightsRecon=n or 1
   return self
 end
 
@@ -781,6 +870,23 @@ function AIRWING:AddPatrolPointCAP(Coordinate, Altitude, Speed, Heading, LegLeng
   return self
 end
 
+--- Add a patrol Point for RECON missions.
+-- @param #AIRWING self
+-- @param Core.Point#COORDINATE Coordinate Coordinate of the patrol point.
+-- @param #number Altitude Orbit altitude in feet.
+-- @param #number Speed Orbit speed in knots.
+-- @param #number Heading Heading in degrees.
+-- @param #number LegLength Length of race-track orbit in NM.
+-- @return #AIRWING self
+function AIRWING:AddPatrolPointRecon(Coordinate, Altitude, Speed, Heading, LegLength)
+
+  local patrolpoint=self:NewPatrolPoint("RECON", Coordinate, Altitude, Speed, Heading, LegLength)
+
+  table.insert(self.pointsRecon, patrolpoint)
+
+  return self
+end
+
 --- Add a patrol Point for TANKER missions.
 -- @param #AIRWING self
 -- @param Core.Point#COORDINATE Coordinate Coordinate of the patrol point.
@@ -825,7 +931,7 @@ function AIRWING:SetAirboss(airboss)
   return self
 end
 
---- Set takeoff type. All assets of this squadron will be spawned with cold (default) or hot engines.
+--- Set takeoff type. All assets of this airwing will be spawned with this takeoff type.
 -- Spawning on runways is not supported.
 -- @param #AIRWING self
 -- @param #string TakeoffType Take off type: "Cold" (default) or "Hot" with engines on or "Air" for spawning in air.
@@ -932,6 +1038,9 @@ function AIRWING:onafterStatus(From, Event, To)
 
   -- Check Rescue Helo missions.
   self:CheckRescuhelo()
+
+  -- Check Recon missions.
+  self:CheckRECON()
 
   ----------------
   -- Transport ---
@@ -1040,13 +1149,14 @@ end
 -- @return #AIRWING self
 function AIRWING:CheckCAP()
 
-  local Ncap=0 --self:CountMissionsInQueue({AUFTRAG.Type.GCICAP, AUFTRAG.Type.INTERCEPT})
+  local Ncap=0 
+
 
   -- Count CAP missions.
   for _,_mission in pairs(self.missionqueue) do
     local mission=_mission --Ops.Auftrag#AUFTRAG
 
-    if mission:IsNotOver() and mission.type==AUFTRAG.Type.GCICAP and mission.patroldata then
+    if mission:IsNotOver() and (mission.type==AUFTRAG.Type.GCICAP or mission.type == AUFTRAG.Type.PATROLRACETRACK) and mission.patroldata then
       Ncap=Ncap+1
     end
 
@@ -1058,8 +1168,26 @@ function AIRWING:CheckCAP()
 
     local altitude=patrol.altitude+1000*patrol.noccupied
 
-    local missionCAP=AUFTRAG:NewGCICAP(patrol.coord, altitude, patrol.speed, patrol.heading, patrol.leg)
-
+    local missionCAP = nil -- Ops.Auftrag#AUFTRAG
+    
+    if self.capOptionPatrolRaceTrack then
+      
+      missionCAP=AUFTRAG:NewPATROL_RACETRACK(patrol.coord,altitude,patrol.speed,patrol.heading,patrol.leg, self.capFormation)
+      
+    else
+        
+      missionCAP=AUFTRAG:NewGCICAP(patrol.coord, altitude, patrol.speed, patrol.heading, patrol.leg)
+    
+    end
+    
+    if self.capOptionVaryStartTime then
+    
+      local ClockStart = math.random(self.capOptionVaryStartTime, self.capOptionVaryEndTime)
+    
+      missionCAP:SetTime(ClockStart)
+    
+    end
+    
     missionCAP.patroldata=patrol
 
     patrol.noccupied=patrol.noccupied+1
@@ -1067,6 +1195,58 @@ function AIRWING:CheckCAP()
     if self.markpoints then AIRWING.UpdatePatrolPointMarker(patrol) end
 
     self:AddMission(missionCAP)
+
+  end
+
+  return self
+end
+
+--- Check how many RECON missions are assigned and add number of missing missions.
+-- @param #AIRWING self
+-- @return #AIRWING self
+function AIRWING:CheckRECON()
+
+  local Ncap=0
+
+  -- Count CAP missions.
+  for _,_mission in pairs(self.missionqueue) do
+    local mission=_mission --Ops.Auftrag#AUFTRAG
+
+    if mission:IsNotOver() and mission.type==AUFTRAG.Type.RECON and mission.patroldata then
+      Ncap=Ncap+1
+    end
+
+  end
+  
+  --self:I(self.lid.."Number of active RECON Missions: "..Ncap)
+  
+  for i=1,self.nflightsRecon-Ncap do
+    
+    --self:I(self.lid.."Creating RECON Missions: "..i)
+    
+    local patrol=self:_GetPatrolData(self.pointsRecon)
+
+    local altitude=patrol.altitude  --+1000*patrol.noccupied
+    
+    local ZoneSet = SET_ZONE:New()
+    local Zone = ZONE_RADIUS:New(self.alias.." Recon "..math.random(1,10000),patrol.coord:GetVec2(),UTILS.NMToMeters(patrol.leg/2))
+    
+    ZoneSet:AddZone(Zone)
+    
+    if self.Debug then
+      Zone:DrawZone(self.coalition,{0,0,1},Alpha,FillColor,FillAlpha,2,true)
+    end
+    
+    local missionRECON=AUFTRAG:NewRECON(ZoneSet,patrol.speed,patrol.altitude,true)
+    
+    missionRECON.patroldata=patrol
+    missionRECON.categories={AUFTRAG.Category.AIRCRAFT}
+
+    patrol.noccupied=patrol.noccupied+1
+
+    if self.markpoints then AIRWING.UpdatePatrolPointMarker(patrol) end
+
+    self:AddMission(missionRECON)
 
   end
 
@@ -1153,7 +1333,6 @@ function AIRWING:CheckAWACS()
     end
 
   end
-
 
   for i=1,self.nflightsAWACS-N do
 
@@ -1242,9 +1421,9 @@ function AIRWING:GetTankerForFlight(flightgroup)
   return nil
 end
 
---- Add the ability to call back an Ops.Awacs#AWACS object with an FSM call "FlightOnMission(FlightGroup, Mission)".
+--- Add the ability to call back an Ops.AWACS#AWACS object with an FSM call "FlightOnMission(FlightGroup, Mission)".
 -- @param #AIRWING self
--- @param Ops.Awacs#AWACS ConnectecdAwacs
+-- @param Ops.AWACS#AWACS ConnectecdAwacs
 -- @return #AIRWING self
 function AIRWING:SetUsingOpsAwacs(ConnectecdAwacs)
   self:I(self.lid .. "Added AWACS Object: "..ConnectecdAwacs:GetName() or "unknown")
@@ -1253,7 +1432,7 @@ function AIRWING:SetUsingOpsAwacs(ConnectecdAwacs)
   return self
 end
 
---- Remove the ability to call back an Ops.Awacs#AWACS object with an FSM call "FlightOnMission(FlightGroup, Mission)".
+--- Remove the ability to call back an Ops.AWACS#AWACS object with an FSM call "FlightOnMission(FlightGroup, Mission)".
 -- @param #AIRWING self
 -- @return #AIRWING self
 function AIRWING:RemoveUsingOpsAwacs()

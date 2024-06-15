@@ -4,10 +4,10 @@
 --
 -- The RANGE class enables easy set up of bombing and strafing ranges within DCS World.
 --
--- Implementation is based on the [Simple Range Script](https://forums.eagle.ru/showthread.php?t=157991) by [Ciribob](https://forums.eagle.ru/member.php?u=112175), which itself was motivated
+-- Implementation is based on the [Simple Range Script](https://forums.eagle.ru/showthread.php?t=157991) by Ciribob, which itself was motivated
 -- by a script by SNAFU [see here](https://forums.eagle.ru/showthread.php?t=109174).
 --
--- [476th - Air Weapons Range Objects mod](http://www.476vfightergroup.com/downloads.php?do=file&id=287) is highly recommended for this class.
+-- [476th - Air Weapons Range Objects mod](https://www.476vfightergroup.com/downloads.php?do=download&downloadid=482) is highly recommended for this class.
 --
 -- **Main Features:**
 --
@@ -42,9 +42,10 @@
 --
 -- ===
 --
--- ### Author: **[funkyfranky](https://forums.eagle.ru/member.php?u=115026)**
+-- ### Author: **funkyfranky**
 --
--- ### Contributions: [FlightControl](https://forums.eagle.ru/member.php?u=89536), [Ciribob](https://forums.eagle.ru/member.php?u=112175)
+-- ### Contributions: FlightControl, Ciribob
+-- ### SRS Additions: Applevangelist
 --
 -- ===
 -- @module Functional.Range
@@ -55,7 +56,7 @@
 -- @field #string ClassName Name of the Class.
 -- @field #boolean Debug If true, debug info is sent as messages on the screen.
 -- @field #boolean verbose Verbosity level. Higher means more output to DCS log file.
--- @field #string id String id of range for output in DCS log.
+-- @field #string lid String id of range for output in DCS log.
 -- @field #string rangename Name of the range.
 -- @field Core.Point#COORDINATE location Coordinate of the range location.
 -- @field #number rangeradius Radius of range defining its total size for e.g. smoking bomb impact points and sending radio messages. Default 5 km.
@@ -85,7 +86,6 @@
 -- @field #number illuminationmaxalt Maximum altitude in meters AGL at which illumination bombs are fired. Default is 1000 m.
 -- @field #number scorebombdistance Distance from closest target up to which bomb hits are counted. Default 1000 m.
 -- @field #number TdelaySmoke Time delay in seconds between impact of bomb and starting the smoke. Default 3 seconds.
--- @field #boolean eventmoose If true, events are handled by MOOSE. If false, events are handled directly by DCS eventhandler. Default true.
 -- @field #boolean trackbombs If true (default), all bomb types are tracked and impact point to closest bombing target is evaluated.
 -- @field #boolean trackrockets If true (default), all rocket types are tracked and impact point to closest bombing target is evaluated.
 -- @field #boolean trackmissiles If true (default), all missile types are tracked and impact point to closest bombing target is evaluated.
@@ -101,6 +101,11 @@
 -- @field #boolean targetsheet If true, players can save their target sheets. Rangeboss will not work if targetsheets do not save.
 -- @field #string targetpath Path where to save the target sheets.
 -- @field #string targetprefix File prefix for target sheet files.
+-- @field Sound.SRS#MSRS controlmsrs SRS wrapper for range controller.
+-- @field Sound.SRS#MSRSQUEUE controlsrsQ SRS queue for range controller.
+-- @field Sound.SRS#MSRS instructmsrs SRS wrapper for range instructor.
+-- @field Sound.SRS#MSRSQUEUE instructsrsQ SRS queue for range instructor.
+-- @field #number Coalition Coalition side for the menu, if any.
 -- @extends Core.Fsm#FSM
 
 --- *Don't only practice your art, but force your way into its secrets; art deserves that, for it and knowledge can raise man to the Divine.* - Ludwig van Beethoven
@@ -133,7 +138,7 @@
 --
 -- A strafe pit can be added to the range by the @{#RANGE.AddStrafePit}(*targetnames, boxlength, boxwidth, heading, inverseheading, goodpass, foulline*) function.
 --
--- * The first parameter *targetnames* defines the target or targets. This can be a single item or a Table with the name(s) of @{Wrapper.Unit} or @{Static} objects defined in the mission editor.
+-- * The first parameter *targetnames* defines the target or targets. This can be a single item or a Table with the name(s) of @{Wrapper.Unit} or @{Wrapper.Static} objects defined in the mission editor.
 -- * In order to perform a valid pass on the strafe pit, the pilot has to begin his run from the correct direction. Therefore, an "approach box" is defined in front
 --   of the strafe targets. The parameters *boxlength* and *boxwidth* define the size of the box in meters, while the *heading* parameter defines the heading of the box FROM the target.
 --   For example, if heading 120 is set, the approach box will start FROM the target and extend outwards on heading 120. A strafe run approach must then be flown apx. heading 300 TOWARDS the target.
@@ -152,7 +157,7 @@
 --
 -- One ore multiple bombing targets can be added to the range by the @{#RANGE.AddBombingTargets}(targetnames, goodhitrange, randommove) function.
 --
--- * The first parameter *targetnames* defines the target or targets. This can be a single item or a Table with the name(s) of @{Wrapper.Unit} or @{Static} objects defined in the mission editor.
+-- * The first parameter *targetnames* defines the target or targets. This can be a single item or a Table with the name(s) of @{Wrapper.Unit} or @{Wrapper.Static} objects defined in the mission editor.
 -- * The (optional) parameter *goodhitrange* specifies the radius in metres around the target within which a bomb/rocket hit is considered to be "good".
 -- * If final (optional) parameter "*randommove*" can be enabled to create moving targets. If this parameter is set to true, the units of this bombing target will randomly move within the range zone.
 --   Note that there might be quirks since DCS units can get stuck in buildings etc. So it might be safer to manually define a route for the units in the mission editor if moving targets are desired.
@@ -164,7 +169,7 @@
 --
 -- ## Specifying Coordinates
 --
--- It is also possible to specify coordinates rather than unit or static objects as bombing target locations. This has the advantage, that even when the unit/static object is dead, the specified 
+-- It is also possible to specify coordinates rather than unit or static objects as bombing target locations. This has the advantage, that even when the unit/static object is dead, the specified
 -- coordinate will still be a valid impact point. This can be done via the @{#RANGE.AddBombingTargetCoordinate}(*coord*, *name*, *goodhitrange*) function.
 --
 -- # Fine Tuning
@@ -225,6 +230,11 @@
 --
 -- By default, the sound files are placed in the "Range Soundfiles/" folder inside the mission (.miz) file. Another folder can be specified via the @{#RANGE.SetSoundfilesPath}(*path*) function.
 --
+-- ## Voice output via SRS
+--
+-- Alternatively, the voice output can be fully done via SRS, **no sound file additions needed**. Set up SRS with @{#RANGE.SetSRS}().
+-- Range control and instructor frequencies and voices can then be set via @{#RANGE.SetSRSRangeControl}() and @{#RANGE.SetSRSRangeInstructor}().
+--
 -- # Persistence
 --
 -- To automatically save bombing results to disk, use the @{#RANGE.SetAutosave}() function. Bombing results will be saved as csv file in your "Saved Games\DCS.openbeta\Logs" directory.
@@ -233,11 +243,11 @@
 -- The next time you start the mission, these results are also automatically loaded.
 --
 -- Strafing results are currently **not** saved.
--- 
+--
 -- # FSM Events
--- 
+--
 -- This class creates additional events that can be used by mission designers for custom reactions
--- 
+--
 -- * `EnterRange` when a player enters a range zone. See @{#RANGE.OnAfterEnterRange}
 -- * `ExitRange`  when a player leaves a range zone. See @{#RANGE.OnAfterExitRange}
 -- * `Impact` on impact of a player's weapon on a bombing target. See @{#RANGE.OnAfterImpact}
@@ -291,7 +301,7 @@
 --      BASE:TraceLevel(1)
 --      BASE:TraceClass("RANGE")
 --
--- To get even more output you can increase the trace level to 2 or even 3, c.f. @{BASE} for more details.
+-- To get even more output you can increase the trace level to 2 or even 3, c.f. @{Core.Base#BASE} for more details.
 --
 -- The function @{#RANGE.DebugON}() can be used to send messages on screen. It also smokes all defined strafe and bombing targets, the strafe pit approach boxes and the range zone.
 --
@@ -333,7 +343,6 @@ RANGE = {
   illuminationmaxalt = 1000,
   scorebombdistance = 1000,
   TdelaySmoke = 3.0,
-  eventmoose = true,
   trackbombs = true,
   trackrockets = true,
   trackmissiles = true,
@@ -347,10 +356,22 @@ RANGE = {
   targetsheet = nil,
   targetpath = nil,
   targetprefix = nil,
-}
+  Coalition = nil,
+  }
 
 --- Default range parameters.
--- @list Defaults
+-- @type RANGE.Defaults
+-- @param #number goodhitrange Radius for good hits in meters.
+-- @param #number strafemaxalt Max altitude in meters for players to enter a strafing pit.
+-- @param #number dtBombtrack Timer interval in seconds.
+-- @param #number Tmsg Message display time in seconds.
+-- @param #number ndisplayresults Number of results to display.
+-- @param #number rangeradius Radius of range in meters.
+-- @param #number TdelaySmoke Time delay in seconds before smoke is triggered.
+-- @param #number boxlength Length of strafe pit box in meters.
+-- @param #number boxwidth Width of strafe pit box in meters.
+-- @param #number goodpass Number of hits for a good strafing pit pass.
+-- @param #number foulline Distance of foul line in meters.
 RANGE.Defaults = {
   goodhitrange = 25,
   strafemaxalt = 914,
@@ -367,13 +388,15 @@ RANGE.Defaults = {
 
 --- Target type, i.e. unit, static, or coordinate.
 -- @type RANGE.TargetType
--- @field #string UNIT Target is a unit.
--- @field #string STATIC Target is a static.
+-- @field #string UNIT Target is a unitobject.
+-- @field #string STATIC Target is a static object.
 -- @field #string COORD Target is a coordinate.
+-- @field #string SCENERY Target is a scenery object.
 RANGE.TargetType = {
   UNIT = "Unit",
   STATIC = "Static",
-  COORD = "Coordinate"
+  COORD = "Coordinate",
+  SCENERY = "Scenery"
 }
 
 --- Player settings.
@@ -385,9 +408,11 @@ RANGE.TargetType = {
 -- @field #boolean messages Display info messages.
 -- @field Wrapper.Client#CLIENT client Client object of player.
 -- @field #string unitname Name of player aircraft unit.
+-- @field Wrapper.Unit#UNIT unit Player unit.
 -- @field #string playername Name of player.
 -- @field #string airframe Aircraft type name.
 -- @field #boolean inzone If true, player is inside the range zone.
+-- @field #boolean targeton Target on.
 
 --- Bomb target data.
 -- @type RANGE.BombTarget
@@ -429,6 +454,25 @@ RANGE.TargetType = {
 -- @field #string airframe Aircraft type of player.
 -- @field #number time Time via timer.getAbsTime() in seconds of impact.
 -- @field #string date OS date.
+-- @field #number attackHdg Attack heading in degrees.
+-- @field #number attackVel Attack velocity in knots.
+-- @field #number attackAlt Attack altitude in feet.
+-- @field #string clock Time of the run.
+-- @field #string rangename Name of the range.
+
+--- Strafe result.
+-- @type RANGE.StrafeResult
+-- @field #string player Player name.
+-- @field #string airframe Aircraft type of player.
+-- @field #number time Time via timer.getAbsTime() in seconds of impact.
+-- @field #string date OS date.
+-- @field #string name Name of the target pit.
+-- @field #number roundsFired Number of rounds fired.
+-- @field #number roundsHit Number of rounds that hit the target.
+-- @field #number strafeAccuracy Accuracy of the run in percent.
+-- @field #string clock Time of the run.
+-- @field #string rangename Name of the range.
+-- @field #boolean invalid Invalid pass.
 
 --- Strafe result.
 -- @type RANGE.StrafeResult
@@ -549,13 +593,14 @@ RANGE.MenuF10Root = nil
 
 --- Range script version.
 -- @field #string version
-RANGE.version = "2.4.0"
+RANGE.version = "2.7.3"
 
 -- TODO list:
 -- TODO: Verbosity level for messages.
 -- TODO: Add option for default settings such as smoke off.
 -- TODO: Add custom weapons, which can be specified by the user.
 -- TODO: Check if units are still alive.
+-- DONE: Scenery as targets.
 -- DONE: Add statics for strafe pits.
 -- DONE: Add missiles.
 -- DONE: Convert env.info() to self:T()
@@ -569,24 +614,26 @@ RANGE.version = "2.4.0"
 
 --- RANGE contructor. Creates a new RANGE object.
 -- @param #RANGE self
--- @param #string rangename Name of the range. Has to be unique. Will we used to create F10 menu items etc.
+-- @param #string RangeName Name of the range. Has to be unique. Will we used to create F10 menu items etc.
+-- @param #number Coalition (optional) Coalition of the range, if any, e.g. coalition.side.BLUE.
 -- @return #RANGE RANGE object.
-function RANGE:New( rangename )
-  BASE:F( { rangename = rangename } )
+function RANGE:New( RangeName, Coalition )
 
   -- Inherit BASE.
   local self = BASE:Inherit( self, FSM:New() ) -- #RANGE
 
   -- Get range name.
   -- TODO: make sure that the range name is not given twice. This would lead to problems in the F10 radio menu.
-  self.rangename = rangename or "Practice Range"
+  self.rangename = RangeName or "Practice Range"
+
+  self.Coalition = Coalition
 
   -- Log id.
-  self.id = string.format( "RANGE %s | ", self.rangename )
+  self.lid = string.format( "RANGE %s | ", self.rangename )
 
   -- Debug info.
   local text = string.format( "Script version %s - creating new RANGE object %s.", RANGE.version, self.rangename )
-  self:I( self.id .. text )
+  self:I( self.lid .. text )
 
   -- Defaults
   self:SetDefaultPlayerSmokeBomb()
@@ -774,7 +821,7 @@ function RANGE:onafterStart()
 
   if self.location == nil then
     local text = string.format( "ERROR! No range location found. Number of strafe targets = %d. Number of bomb targets = %d.", self.nstrafetargets, self.nbombtargets )
-    self:E( self.id .. text )
+    self:E( self.lid .. text )
     return
   end
 
@@ -785,37 +832,26 @@ function RANGE:onafterStart()
 
   -- Starting range.
   local text = string.format( "Starting RANGE %s. Number of strafe targets = %d. Number of bomb targets = %d.", self.rangename, self.nstrafetargets, self.nbombtargets )
-  self:I( self.id .. text )
+  self:I( self.lid .. text )
 
   -- Event handling.
-  if self.eventmoose then
-    -- Events are handled my MOOSE.
-    self:T( self.id .. "Events are handled by MOOSE." )
-    self:HandleEvent( EVENTS.Birth )
-    self:HandleEvent( EVENTS.Hit )
-    self:HandleEvent( EVENTS.Shot )
-  else
-    -- Events are handled directly by DCS.
-    self:T( self.id .. "Events are handled directly by DCS." )
-    world.addEventHandler( self )
-  end
+  self:HandleEvent( EVENTS.Birth )
+  self:HandleEvent( EVENTS.Hit )
+  self:HandleEvent( EVENTS.Shot )
 
   -- Make bomb target move randomly within the range zone.
   for _, _target in pairs( self.bombingTargets ) do
+    local target=_target --#RANGE.BombTarget
 
-    -- Check if it is a static object.
-    -- local _static=self:_CheckStatic(_target.target:GetName())
-    local _static = _target.type == RANGE.TargetType.STATIC
-
-    if _target.move and _static == false and _target.speed > 1 then
-      local unit = _target.target -- Wrapper.Unit#UNIT
-      _target.target:PatrolZones( { self.rangezone }, _target.speed * 0.75, "Off road" )
+    -- Check if unit and can move.
+    if target.move and target.type==RANGE.TargetType.UNIT and target.speed > 1 then
+      target.target:PatrolZones( { self.rangezone }, target.speed * 0.75, ENUMS.Formation.Vehicle.OffRoad )
     end
 
   end
 
   -- Init range control.
-  if self.rangecontrolfreq then
+  if self.rangecontrolfreq and not self.useSRS then
 
     -- Radio queue.
     self.rangecontrol = RADIOQUEUE:New( self.rangecontrolfreq, nil, self.rangename )
@@ -841,7 +877,7 @@ function RANGE:onafterStart()
     self.rangecontrol:Start( 1, 0.1 )
 
     -- Init range control.
-    if self.instructorfreq then
+    if self.instructorfreq and not self.useSRS then
 
       -- Radio queue.
       self.instructor = RADIOQUEUE:New( self.instructorfreq, nil, self.rangename )
@@ -950,6 +986,19 @@ function RANGE:SetTargetSheet( path, prefix )
   return self
 end
 
+--- Set FunkMan socket. Bombing and strafing results will be send to your Discord bot.
+-- **Requires running FunkMan program**.
+-- @param #RANGE self
+-- @param #number Port Port. Default `10042`.
+-- @param #string Host Host. Default "127.0.0.1".
+-- @return #RANGE self
+function RANGE:SetFunkManOn(Port, Host)
+
+  self.funkmanSocket=SOCKET:New(Port, Host)
+
+  return self
+end
+
 --- Set messages to examiner. The examiner will receive messages from all clients.
 -- @param #RANGE self
 -- @param #string examinergroupname Name of the group of the examiner.
@@ -1023,7 +1072,7 @@ end
 
 --- Set smoke color for marking bomb targets. By default bomb targets are marked by red smoke.
 -- @param #RANGE self
--- @param Utilities.Utils#SMOKECOLOR colorid Color id. Default SMOKECOLOR.Red.
+-- @param Utilities.Utils#SMOKECOLOR colorid Color id. Default `SMOKECOLOR.Red`.
 -- @return #RANGE self
 function RANGE:SetBombTargetSmokeColor( colorid )
   self.BombSmokeColor = colorid or SMOKECOLOR.Red
@@ -1041,7 +1090,7 @@ end
 
 --- Set smoke color for marking strafe targets. By default strafe targets are marked by green smoke.
 -- @param #RANGE self
--- @param Utilities.Utils#SMOKECOLOR colorid Color id. Default SMOKECOLOR.Green.
+-- @param Utilities.Utils#SMOKECOLOR colorid Color id. Default `SMOKECOLOR.Green`.
 -- @return #RANGE self
 function RANGE:SetStrafeTargetSmokeColor( colorid )
   self.StrafeSmokeColor = colorid or SMOKECOLOR.Green
@@ -1050,7 +1099,7 @@ end
 
 --- Set smoke color for marking strafe pit approach boxes. By default strafe pit boxes are marked by white smoke.
 -- @param #RANGE self
--- @param Utilities.Utils#SMOKECOLOR colorid Color id. Default SMOKECOLOR.White.
+-- @param Utilities.Utils#SMOKECOLOR colorid Color id. Default `SMOKECOLOR.White`.
 -- @return #RANGE self
 function RANGE:SetStrafePitSmokeColor( colorid )
   self.StrafePitSmokeColor = colorid or SMOKECOLOR.White
@@ -1146,7 +1195,107 @@ function RANGE:TrackMissilesOFF()
   return self
 end
 
---- Enable range control and set frequency.
+--- Use SRS Simple-Text-To-Speech for transmissions. No sound files necessary.
+-- @param #RANGE self
+-- @param #string PathToSRS Path to SRS directory.
+-- @param #number Port SRS port. Default 5002.
+-- @param #number Coalition Coalition side, e.g. `coalition.side.BLUE` or `coalition.side.RED`. Default `coalition.side.BLUE`.
+-- @param #number Frequency Frequency to use. Default is 256 MHz for range control and 305 MHz for instructor. If given, both control and instructor get this frequency.
+-- @param #number Modulation Modulation to use, defaults to radio.modulation.AM
+-- @param #number Volume Volume, between 0.0 and 1.0. Defaults to 1.0
+-- @param #string PathToGoogleKey Path to Google TTS credentials.
+-- @return #RANGE self
+function RANGE:SetSRS(PathToSRS, Port, Coalition, Frequency, Modulation, Volume, PathToGoogleKey)
+
+  if PathToSRS or MSRS.path then
+
+    self.useSRS=true
+
+    self.controlmsrs=MSRS:New(PathToSRS or MSRS.path, Frequency or 256, Modulation or radio.modulation.AM)
+    self.controlmsrs:SetPort(Port or MSRS.port)
+    self.controlmsrs:SetCoalition(Coalition or coalition.side.BLUE)
+    self.controlmsrs:SetLabel("RANGEC")
+    self.controlmsrs:SetVolume(Volume or 1.0)
+    self.controlsrsQ = MSRSQUEUE:New("CONTROL")
+
+    self.instructmsrs=MSRS:New(PathToSRS or MSRS.path, Frequency or 305, Modulation or radio.modulation.AM)
+    self.instructmsrs:SetPort(Port or MSRS.port)
+    self.instructmsrs:SetCoalition(Coalition or coalition.side.BLUE)
+    self.instructmsrs:SetLabel("RANGEI")
+    self.instructmsrs:SetVolume(Volume or 1.0)
+    self.instructsrsQ = MSRSQUEUE:New("INSTRUCT")
+
+    if PathToGoogleKey then
+      self.controlmsrs:SetGoogle(PathToGoogleKey)
+      self.instructmsrs:SetGoogle(PathToGoogleKey)
+    end
+
+  else
+    self:E(self.lid..string.format("ERROR: No SRS path specified!"))
+  end
+  return self
+end
+
+--- (SRS) Set range control frequency and voice. Use `RANGE:SetSRS()` once first before using this function.
+-- @param #RANGE self
+-- @param #number frequency Frequency in MHz. Default 256 MHz.
+-- @param #number modulation Modulation, defaults to radio.modulation.AM.
+-- @param #string voice Voice.
+-- @param #string culture Culture, defaults to "en-US".
+-- @param #string gender Gender, defaults to "female".
+-- @param #string relayunitname Name of the unit used for transmission location.
+-- @return #RANGE self
+function RANGE:SetSRSRangeControl( frequency, modulation, voice, culture, gender, relayunitname )
+  if not self.instructmsrs then
+    self:E(self.lid.."Use myrange:SetSRS() once first before using myrange:SetSRSRangeControl!")
+    return self
+  end
+  self.rangecontrolfreq = frequency or 256
+  self.controlmsrs:SetFrequencies(self.rangecontrolfreq)
+  self.controlmsrs:SetModulations(modulation or radio.modulation.AM)
+  self.controlmsrs:SetVoice(voice)
+  self.controlmsrs:SetCulture(culture or "en-US")
+  self.controlmsrs:SetGender(gender or "female")
+  self.rangecontrol = true
+  if relayunitname then
+    local unit = UNIT:FindByName(relayunitname)
+    local Coordinate = unit:GetCoordinate()
+    self.rangecontrolrelayname = relayunitname
+  end
+  return self
+end
+
+--- (SRS) Set range instructor frequency and voice. Use `RANGE:SetSRS()` once first before using this function.
+-- @param #RANGE self
+-- @param #number frequency Frequency in MHz. Default 305 MHz.
+-- @param #number modulation Modulation, defaults to radio.modulation.AM.
+-- @param #string voice Voice.
+-- @param #string culture Culture, defaults to "en-US".
+-- @param #string gender Gender, defaults to "male".
+-- @param #string relayunitname Name of the unit used for transmission location.
+-- @return #RANGE self
+function RANGE:SetSRSRangeInstructor( frequency, modulation, voice, culture, gender, relayunitname )
+  if not self.instructmsrs then
+    self:E(self.lid.."Use myrange:SetSRS() once first before using myrange:SetSRSRangeInstructor!")
+    return self
+  end
+  self.instructorfreq = frequency or 305
+  self.instructmsrs:SetFrequencies(self.instructorfreq)
+  self.instructmsrs:SetModulations(modulation or radio.modulation.AM)
+  self.instructmsrs:SetVoice(voice)
+  self.instructmsrs:SetCulture(culture or "en-US")
+  self.instructmsrs:SetGender(gender or "male")
+  self.instructor = true
+  if relayunitname then
+    local unit = UNIT:FindByName(relayunitname)
+    local Coordinate = unit:GetCoordinate()
+    self.instructmsrs:SetCoordinate(Coordinate)
+    self.instructorrelayname = relayunitname
+  end
+  return self
+end
+
+--- Enable range control and set frequency (non-SRS).
 -- @param #RANGE self
 -- @param #number frequency Frequency in MHz. Default 256 MHz.
 -- @param #string relayunitname Name of the unit used for transmission.
@@ -1157,7 +1306,7 @@ function RANGE:SetRangeControl( frequency, relayunitname )
   return self
 end
 
---- Enable instructor radio and set frequency.
+--- Enable instructor radio and set frequency (non-SRS).
 -- @param #RANGE self
 -- @param #number frequency Frequency in MHz. Default 305 MHz.
 -- @param #string relayunitname Name of the unit used for transmission.
@@ -1174,7 +1323,7 @@ end
 -- @return #RANGE self
 function RANGE:SetSoundfilesPath( path )
   self.soundpath = tostring( path or "Range Soundfiles/" )
-  self:I( self.id .. string.format( "Setting sound files path to %s", self.soundpath ) )
+  self:I( self.lid .. string.format( "Setting sound files path to %s", self.soundpath ) )
   return self
 end
 
@@ -1212,20 +1361,20 @@ function RANGE:AddStrafePit( targetnames, boxlength, boxwidth, heading, inverseh
     if _isstatic == true then
 
       -- Add static object.
-      self:T( self.id .. string.format( "Adding STATIC object %s as strafe target #%d.", _name, _i ) )
+      self:T( self.lid .. string.format( "Adding STATIC object %s as strafe target #%d.", _name, _i ) )
       unit = STATIC:FindByName( _name, false )
 
     elseif _isstatic == false then
 
       -- Add unit object.
-      self:T( self.id .. string.format( "Adding UNIT object %s as strafe target #%d.", _name, _i ) )
+      self:T( self.lid .. string.format( "Adding UNIT object %s as strafe target #%d.", _name, _i ) )
       unit = UNIT:FindByName( _name )
 
     else
 
       -- Neither unit nor static object with this name could be found.
       local text = string.format( "ERROR! Could not find ANY strafe target object with name %s.", _name )
-      self:E( self.id .. text )
+      self:E( self.lid .. text )
 
     end
 
@@ -1244,7 +1393,7 @@ function RANGE:AddStrafePit( targetnames, boxlength, boxwidth, heading, inverseh
   -- Check if at least one target could be found.
   if ntargets == 0 then
     local text = string.format( "ERROR! No strafe target could be found when calling RANGE:AddStrafePit() for range %s", self.rangename )
-    self:E( self.id .. text )
+    self:E( self.lid .. text )
     return
   end
 
@@ -1313,7 +1462,7 @@ function RANGE:AddStrafePit( targetnames, boxlength, boxwidth, heading, inverseh
 
   -- Debug info
   local text = string.format( "Adding new strafe target %s with %d targets: heading = %03d, box_L = %.1f, box_W = %.1f, goodpass = %d, foul line = %.1f", _name, ntargets, heading, l, w, goodpass, foulline )
-  self:T( self.id .. text )
+  self:T( self.lid .. text )
 
   return self
 end
@@ -1383,14 +1532,14 @@ function RANGE:AddBombingTargets( targetnames, goodhitrange, randommove )
 
     if _isstatic == true then
       local _static = STATIC:FindByName( name )
-      self:T2( self.id .. string.format( "Adding static bombing target %s with hit range %d.", name, goodhitrange, false ) )
+      self:T2( self.lid .. string.format( "Adding static bombing target %s with hit range %d.", name, goodhitrange, false ) )
       self:AddBombingTargetUnit( _static, goodhitrange )
     elseif _isstatic == false then
       local _unit = UNIT:FindByName( name )
-      self:T2( self.id .. string.format( "Adding unit bombing target %s with hit range %d.", name, goodhitrange, randommove ) )
-      self:AddBombingTargetUnit( _unit, goodhitrange )
+      self:T2( self.lid .. string.format( "Adding unit bombing target %s with hit range %d.", name, goodhitrange, randommove ) )
+      self:AddBombingTargetUnit( _unit, goodhitrange, randommove )
     else
-      self:E( self.id .. string.format( "ERROR! Could not find bombing target %s.", name ) )
+      self:E( self.lid .. string.format( "ERROR! Could not find bombing target %s.", name ) )
     end
 
   end
@@ -1400,7 +1549,7 @@ end
 
 --- Add a unit or static object as bombing target.
 -- @param #RANGE self
--- @param Wrapper.Positionable#POSITIONABLE unit Positionable (unit or static) of the strafe target.
+-- @param Wrapper.Positionable#POSITIONABLE unit Positionable (unit or static) of the bombing target.
 -- @param #number goodhitrange Max distance from unit which is considered as a good hit.
 -- @param #boolean randommove If true, unit will move randomly within the range. Default is false.
 -- @return #RANGE self
@@ -1423,11 +1572,11 @@ function RANGE:AddBombingTargetUnit( unit, goodhitrange, randommove )
 
   -- Debug or error output.
   if _isstatic == true then
-    self:I( self.id .. string.format( "Adding STATIC bombing target %s with good hit range %d. Random move = %s.", name, goodhitrange, tostring( randommove ) ) )
+    self:I( self.lid .. string.format( "Adding STATIC bombing target %s with good hit range %d. Random move = %s.", name, goodhitrange, tostring( randommove ) ) )
   elseif _isstatic == false then
-    self:I( self.id .. string.format( "Adding UNIT bombing target %s with good hit range %d. Random move = %s.", name, goodhitrange, tostring( randommove ) ) )
+    self:I( self.lid .. string.format( "Adding UNIT bombing target %s with good hit range %d. Random move = %s.", name, goodhitrange, tostring( randommove ) ) )
   else
-    self:E( self.id .. string.format( "ERROR! No bombing target with name %s could be found. Carefully check all UNIT and STATIC names defined in the mission editor!", name ) )
+    self:E( self.lid .. string.format( "ERROR! No bombing target with name %s could be found. Carefully check all UNIT and STATIC names defined in the mission editor!", name ) )
   end
 
   -- Get max speed of unit in km/h.
@@ -1478,6 +1627,42 @@ function RANGE:AddBombingTargetCoordinate( coord, name, goodhitrange )
   return self
 end
 
+--- Add a scenery object as bombing target.
+-- @param #RANGE self
+-- @param Wrapper.Scenery#SCENERY scenery Scenary object.
+-- @param #number goodhitrange Max distance from unit which is considered as a good hit.
+-- @return #RANGE self
+function RANGE:AddBombingTargetScenery( scenery, goodhitrange)
+
+  -- Get name of positionable.
+  local name = scenery:GetName()
+
+  -- Default range is 25 m.
+  goodhitrange = goodhitrange or RANGE.Defaults.goodhitrange
+
+  -- Debug or error output.
+  if name then
+    self:I( self.lid .. string.format( "Adding SCENERY bombing target %s with good hit range %d", name, goodhitrange) )
+  else
+    self:E( self.lid .. string.format( "ERROR! No bombing target with name %s could be found!", name ) )
+  end
+
+
+  local target = {} -- #RANGE.BombTarget
+  target.name = name
+  target.target = scenery
+  target.goodhitrange = goodhitrange
+  target.move = false
+  target.speed = 0
+  target.coordinate = scenery:GetCoordinate()
+  target.type = RANGE.TargetType.SCENERY
+
+  -- Insert target to table.
+  table.insert( self.bombingTargets, target )
+
+  return self
+end
+
 --- Add all units of a group as bombing targets.
 -- @param #RANGE self
 -- @param Wrapper.Group#GROUP group Group of bombing targets.
@@ -1520,7 +1705,7 @@ function RANGE:GetFoullineDistance( namepit, namefoulline )
   elseif _staticpit == false then
     pit = UNIT:FindByName( namepit )
   else
-    self:E( self.id .. string.format( "ERROR! Pit object %s could not be found in GetFoullineDistance function. Check the name in the ME.", namepit ) )
+    self:E( self.lid .. string.format( "ERROR! Pit object %s could not be found in GetFoullineDistance function. Check the name in the ME.", namepit ) )
   end
 
   -- Get the unit or static foul line object.
@@ -1530,7 +1715,7 @@ function RANGE:GetFoullineDistance( namepit, namefoulline )
   elseif _staticfoul == false then
     foul = UNIT:FindByName( namefoulline )
   else
-    self:E( self.id .. string.format( "ERROR! Foul line object %s could not be found in GetFoullineDistance function. Check the name in the ME.", namefoulline ) )
+    self:E( self.lid .. string.format( "ERROR! Foul line object %s could not be found in GetFoullineDistance function. Check the name in the ME.", namefoulline ) )
   end
 
   -- Get the distance between the two objects.
@@ -1538,10 +1723,10 @@ function RANGE:GetFoullineDistance( namepit, namefoulline )
   if pit ~= nil and foul ~= nil then
     fouldist = pit:GetCoordinate():Get2DDistance( foul:GetCoordinate() )
   else
-    self:E( self.id .. string.format( "ERROR! Foul line distance could not be determined. Check pit object name %s and foul line object name %s in the ME.", namepit, namefoulline ) )
+    self:E( self.lid .. string.format( "ERROR! Foul line distance could not be determined. Check pit object name %s and foul line object name %s in the ME.", namepit, namefoulline ) )
   end
 
-  self:T( self.id .. string.format( "Foul line distance = %.1f m.", fouldist ) )
+  self:T( self.lid .. string.format( "Foul line distance = %.1f m.", fouldist ) )
   return fouldist
 end
 
@@ -1549,85 +1734,20 @@ end
 -- Event Handling
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
---- General event handler.
--- @param #RANGE self
--- @param #table Event DCS event table.
-function RANGE:onEvent( Event )
-  self:F3( Event )
-
-  if Event == nil or Event.initiator == nil then
-    self:T3( "Skipping onEvent. Event or Event.initiator unknown." )
-    return true
-  end
-  if Unit.getByName( Event.initiator:getName() ) == nil then
-    self:T3( "Skipping onEvent. Initiator unit name unknown." )
-    return true
-  end
-
-  local DCSiniunit = Event.initiator
-  local DCStgtunit = Event.target
-  local DCSweapon = Event.weapon
-
-  local EventData = {}
-  local _playerunit = nil
-  local _playername = nil
-
-  if Event.initiator then
-    EventData.IniUnitName = Event.initiator:getName()
-    EventData.IniDCSGroup = Event.initiator:getGroup()
-    EventData.IniGroupName = Event.initiator:getGroup():getName()
-    -- Get player unit and name. This returns nil,nil if the event was not fired by a player unit. And these are the only events we are interested in.
-    _playerunit, _playername = self:_GetPlayerUnitAndName( EventData.IniUnitName )
-  end
-
-  if Event.target then
-    EventData.TgtUnitName = Event.target:getName()
-    EventData.TgtUnit = UNIT:FindByName( EventData.TgtUnitName )
-  end
-
-  if Event.weapon then
-    EventData.Weapon = Event.weapon
-    EventData.weapon = Event.weapon
-    EventData.WeaponTypeName = Event.weapon:getTypeName()
-  end
-
-  -- Event info.
-  self:T3( self.id .. string.format( "EVENT: Event in onEvent with ID = %s", tostring( Event.id ) ) )
-  self:T3( self.id .. string.format( "EVENT: Ini unit   = %s", tostring( EventData.IniUnitName ) ) )
-  self:T3( self.id .. string.format( "EVENT: Ini group  = %s", tostring( EventData.IniGroupName ) ) )
-  self:T3( self.id .. string.format( "EVENT: Ini player = %s", tostring( _playername ) ) )
-  self:T3( self.id .. string.format( "EVENT: Tgt unit   = %s", tostring( EventData.TgtUnitName ) ) )
-  self:T3( self.id .. string.format( "EVENT: Wpn type   = %s", tostring( EventData.WeaponTypeName ) ) )
-
-  -- Call event Birth function.
-  if Event.id == world.event.S_EVENT_BIRTH and _playername then
-    self:OnEventBirth( EventData )
-  end
-
-  -- Call event Shot function.
-  if Event.id == world.event.S_EVENT_SHOT and _playername and Event.weapon then
-    self:OnEventShot( EventData )
-  end
-
-  -- Call event Hit function.
-  if Event.id == world.event.S_EVENT_HIT and _playername and DCStgtunit then
-    self:OnEventHit( EventData )
-  end
-
-end
-
 --- Range event handler for event birth.
 -- @param #RANGE self
 -- @param Core.Event#EVENTDATA EventData
 function RANGE:OnEventBirth( EventData )
   self:F( { eventbirth = EventData } )
 
+  if not EventData.IniPlayerName then return end
+
   local _unitName = EventData.IniUnitName
   local _unit, _playername = self:_GetPlayerUnitAndName( _unitName )
 
-  self:T3( self.id .. "BIRTH: unit   = " .. tostring( EventData.IniUnitName ) )
-  self:T3( self.id .. "BIRTH: group  = " .. tostring( EventData.IniGroupName ) )
-  self:T3( self.id .. "BIRTH: player = " .. tostring( _playername ) )
+  self:T3( self.lid .. "BIRTH: unit   = " .. tostring( EventData.IniUnitName ) )
+  self:T3( self.lid .. "BIRTH: group  = " .. tostring( EventData.IniGroupName ) )
+  self:T3( self.lid .. "BIRTH: player = " .. tostring( _playername ) )
 
   if _unit and _playername then
 
@@ -1638,13 +1758,19 @@ function RANGE:OnEventBirth( EventData )
 
     -- Debug output.
     local text = string.format( "Player %s, callsign %s entered unit %s (UID %d) of group %s (GID %d)", _playername, _callsign, _unitName, _uid, _group:GetName(), _gid )
-    self:T( self.id .. text )
+    self:T( self.lid .. text )
 
     -- Reset current strafe status.
     self.strafeStatus[_uid] = nil
 
-    -- Add Menu commands after a delay of 0.1 seconds.
-    self:ScheduleOnce( 0.1, self._AddF10Commands, self, _unitName )
+    if self.Coalition then
+      if EventData.IniCoalition == self.Coalition then
+        self:ScheduleOnce( 0.1, self._AddF10Commands, self, _unitName )
+      end
+    else
+      -- Add Menu commands after a delay of 0.1 seconds.
+      self:ScheduleOnce( 0.1, self._AddF10Commands, self, _unitName )
+    end
 
     -- By default, some bomb impact points and do not flare each hit on target.
     self.PlayerSettings[_playername] = {} -- #RANGE.PlayerData
@@ -1656,6 +1782,7 @@ function RANGE:OnEventBirth( EventData )
     self.PlayerSettings[_playername].messages = true
     self.PlayerSettings[_playername].client = CLIENT:FindByName( _unitName, nil, true )
     self.PlayerSettings[_playername].unitname = _unitName
+    self.PlayerSettings[_playername].unit = _unit
     self.PlayerSettings[_playername].playername = _playername
     self.PlayerSettings[_playername].airframe = EventData.IniUnit:GetTypeName()
     self.PlayerSettings[_playername].inzone = false
@@ -1676,9 +1803,9 @@ function RANGE:OnEventHit( EventData )
   self:F( { eventhit = EventData } )
 
   -- Debug info.
-  self:T3( self.id .. "HIT: Ini unit   = " .. tostring( EventData.IniUnitName ) )
-  self:T3( self.id .. "HIT: Ini group  = " .. tostring( EventData.IniGroupName ) )
-  self:T3( self.id .. "HIT: Tgt target = " .. tostring( EventData.TgtUnitName ) )
+  self:T3( self.lid .. "HIT: Ini unit   = " .. tostring( EventData.IniUnitName ) )
+  self:T3( self.lid .. "HIT: Ini group  = " .. tostring( EventData.IniGroupName ) )
+  self:T3( self.lid .. "HIT: Tgt target = " .. tostring( EventData.TgtUnitName ) )
 
   -- Player info
   local _unitName = EventData.IniUnitName
@@ -1724,11 +1851,15 @@ function RANGE:OnEventHit( EventData )
           -- Too close to the target.
           if _currentTarget.pastfoulline == false and _unit and _playername then
             local _d = _currentTarget.zone.foulline
+            -- DONE - SRS output
             local text = string.format( "%s, Invalid hit!\nYou already passed foul line distance of %d m for target %s.", self:_myname( _unitName ), _d, targetname )
+            if self.useSRS then
+              local ttstext = string.format( "%s, Invalid hit! You already passed foul line distance of %d meters for target %s.", self:_myname( _unitName ), _d, targetname )
+              self.controlsrsQ:NewTransmission(ttstext,nil,self.controlmsrs,nil,2)
+            end
             self:_DisplayMessageToGroup( _unit, text )
-            self:T2( self.id .. text )
+            self:T2( self.lid .. text )
             _currentTarget.pastfoulline = true
-            invalidStrafe = true -- Rangeboss Edit
           end
         end
 
@@ -1760,6 +1891,141 @@ function RANGE:OnEventHit( EventData )
   end
 end
 
+--- Function called on impact of a tracked weapon.
+-- @param Wrapper.Weapon#WEAPON weapon The weapon object.
+-- @param #RANGE self RANGE object.
+-- @param #RANGE.PlayerData playerData Player data table.
+-- @param #number attackHdg Attack heading.
+-- @param #number attackAlt Attack altitude.
+-- @param #number attackVel Attack velocity.
+function RANGE._OnImpact(weapon, self, playerData, attackHdg, attackAlt, attackVel)
+
+  -- Get closet target to last position.
+  local _closetTarget = nil -- #RANGE.BombTarget
+  local _distance = nil
+  local _closeCoord = nil   --Core.Point#COORDINATE
+  local _hitquality = "POOR"
+
+  -- Get callsign.
+  local _callsign = self:_myname( playerData.unitname )
+
+  local _playername=playerData.playername
+
+  local _unit=playerData.unit
+
+  -- Coordinate of impact point.
+  local impactcoord = weapon:GetImpactCoordinate()
+
+  -- Check if impact happened in range zone.
+  local insidezone = self.rangezone:IsCoordinateInZone( impactcoord )
+
+
+  -- Smoke impact point of bomb.
+  if playerData.smokebombimpact and insidezone then
+    if playerData.delaysmoke then
+      timer.scheduleFunction( self._DelayedSmoke, { coord = impactcoord, color = playerData.smokecolor }, timer.getTime() + self.TdelaySmoke )
+    else
+      impactcoord:Smoke( playerData.smokecolor )
+    end
+  end
+
+  -- Loop over defined bombing targets.
+  for _, _bombtarget in pairs( self.bombingTargets ) do
+    local bombtarget=_bombtarget  --#RANGE.BombTarget
+
+    -- Get target coordinate.
+    local targetcoord = self:_GetBombTargetCoordinate( _bombtarget )
+
+    if targetcoord then
+
+      -- Distance between bomb and target.
+      local _temp = impactcoord:Get2DDistance( targetcoord )
+
+      -- Find closest target to last known position of the bomb.
+      if _distance == nil or _temp < _distance then
+        _distance = _temp
+        _closetTarget = bombtarget
+        _closeCoord   = targetcoord
+        if _distance <= 1.53 then -- Rangeboss Edit
+          _hitquality = "SHACK" -- Rangeboss Edit
+        elseif _distance <= 0.5 * bombtarget.goodhitrange then -- Rangeboss Edit
+          _hitquality = "EXCELLENT"
+        elseif _distance <= bombtarget.goodhitrange then
+          _hitquality = "GOOD"
+        elseif _distance <= 2 * bombtarget.goodhitrange then
+          _hitquality = "INEFFECTIVE"
+        else
+          _hitquality = "POOR"
+        end
+
+      end
+    end
+  end
+
+  -- Count if bomb fell less than ~1 km away from the target.
+  if _distance and _distance <= self.scorebombdistance then
+    -- Init bomb player results.
+    if not self.bombPlayerResults[_playername] then
+      self.bombPlayerResults[_playername] = {}
+    end
+
+    -- Local results.
+    local _results = self.bombPlayerResults[_playername]
+
+    local result = {} -- #RANGE.BombResult
+    result.command=SOCKET.DataType.BOMBRESULT
+    result.name = _closetTarget.name or "unknown"
+    result.distance = _distance
+    result.radial = _closeCoord:HeadingTo( impactcoord )
+    result.weapon = weapon:GetTypeName() or "unknown"
+    result.quality = _hitquality
+    result.player = playerData.playername
+    result.time = timer.getAbsTime()
+    result.clock = UTILS.SecondsToClock(result.time, true)
+    result.midate = UTILS.GetDCSMissionDate()
+    result.theatre = env.mission.theatre
+    result.airframe = playerData.airframe
+    result.roundsFired = 0 -- Rangeboss Edit
+    result.roundsHit = 0 -- Rangeboss Edit
+    result.roundsQuality = "N/A" -- Rangeboss Edit
+    result.rangename = self.rangename
+    result.attackHdg = attackHdg
+    result.attackVel = attackVel
+    result.attackAlt = attackAlt
+    result.date=os and os.date() or "n/a"
+
+    -- Add to table.
+    table.insert( _results, result )
+
+    -- Call impact.
+    self:Impact( result, playerData )
+
+  elseif insidezone then
+
+    -- Send message.
+    -- DONE SRS message
+    local _message = string.format( "%s, weapon impacted too far from nearest range target (>%.1f km). No score!", _callsign, self.scorebombdistance / 1000 )
+    if self.useSRS then
+      local ttstext = string.format( "%s, weapon impacted too far from nearest range target, mor than %.1f kilometer. No score!", _callsign, self.scorebombdistance / 1000 )
+      self.controlsrsQ:NewTransmission(ttstext,nil,self.controlmsrs,nil,2)
+    end
+    self:_DisplayMessageToGroup( _unit, _message, nil, false )
+
+    if self.rangecontrol then
+      -- weapon impacted too far from the nearest target! No Score!
+      if self.useSRS then
+        self.controlsrsQ:NewTransmission(_message,nil,self.controlmsrs,nil,1)
+      else
+        self.rangecontrol:NewTransmission( RANGE.Sound.RCWeaponImpactedTooFar.filename, RANGE.Sound.RCWeaponImpactedTooFar.duration, self.soundpath, nil, nil, _message, self.subduration )
+      end
+    end
+
+  else
+    self:T( self.lid .. "Weapon impacted outside range zone." )
+  end
+
+end
+
 --- Range event handler for event shot (when a unit releases a rocket or bomb (but not a fast firing gun).
 -- @param #RANGE self
 -- @param Core.Event#EVENTDATA EventData
@@ -1767,39 +2033,15 @@ function RANGE:OnEventShot( EventData )
   self:F( { eventshot = EventData } )
 
   -- Nil checks.
-  if EventData.Weapon == nil then
-    return
-  end
-  if EventData.IniDCSUnit == nil then
+  if EventData.Weapon == nil or EventData.IniDCSUnit == nil or EventData.IniPlayerName == nil then
     return
   end
 
-  -- Weapon data.
-  local _weapon = EventData.Weapon:getTypeName() -- should be the same as Event.WeaponTypeName
-  local _weaponStrArray = UTILS.Split( _weapon, "%." )
-  local _weaponName = _weaponStrArray[#_weaponStrArray]
-
-  -- Weapon descriptor.
-  local desc = EventData.Weapon:getDesc()
-
-  -- Weapon category: 0=SHELL, 1=MISSILE, 2=ROCKET, 3=BOMB (Weapon.Category.X)
-  local weaponcategory = desc.category
-
-  -- Debug info.
-  self:T( self.id .. "EVENT SHOT: Range " .. self.rangename )
-  self:T( self.id .. "EVENT SHOT: Ini unit    = " .. EventData.IniUnitName )
-  self:T( self.id .. "EVENT SHOT: Ini group   = " .. EventData.IniGroupName )
-  self:T( self.id .. "EVENT SHOT: Weapon type = " .. _weapon )
-  self:T( self.id .. "EVENT SHOT: Weapon name = " .. _weaponName )
-  self:T( self.id .. "EVENT SHOT: Weapon cate = " .. weaponcategory )
-
-  -- Tracking conditions for bombs, rockets and missiles.
-  local _bombs = weaponcategory == Weapon.Category.BOMB -- string.match(_weapon, "weapons.bombs")
-  local _rockets = weaponcategory == Weapon.Category.ROCKET -- string.match(_weapon, "weapons.nurs")
-  local _missiles = weaponcategory == Weapon.Category.MISSILE -- string.match(_weapon, "weapons.missiles") or _viggen
+  -- Create weapon object.
+  local weapon=WEAPON:New(EventData.weapon)
 
   -- Check if any condition applies here.
-  local _track = (_bombs and self.trackbombs) or (_rockets and self.trackrockets) or (_missiles and self.trackmissiles)
+  local _track = (weapon:IsBomb() and self.trackbombs) or (weapon:IsRocket() and self.trackrockets) or (weapon:IsMissile() and self.trackmissiles)
 
   -- Get unit name.
   local _unitName = EventData.IniUnitName
@@ -1807,13 +2049,13 @@ function RANGE:OnEventShot( EventData )
   -- Get player unit and name.
   local _unit, _playername = self:_GetPlayerUnitAndName( _unitName )
 
-  -- Set this to larger value than the threshold.
+  -- Distance Player-to-Range. Set this to larger value than the threshold.
   local dPR = self.BombtrackThreshold * 2
 
   -- Distance player to range.
   if _unit and _playername then
     dPR = _unit:GetCoordinate():Get2DDistance( self.location )
-    self:T( self.id .. string.format( "Range %s, player %s, player-range distance = %d km.", self.rangename, _playername, dPR / 1000 ) )
+    self:T( self.lid .. string.format( "Range %s, player %s, player-range distance = %d km.", self.rangename, _playername, dPR / 1000 ) )
   end
 
   -- Only track if distance player to range is < 25 km. Also check that a player shot. No need to track AI weapons.
@@ -1822,157 +2064,23 @@ function RANGE:OnEventShot( EventData )
     -- Player data.
     local playerData = self.PlayerSettings[_playername] -- #RANGE.PlayerData
 
+    -- Attack parameters.
+    local attackHdg=_unit:GetHeading()
+    local attackAlt=_unit:GetHeight()
+    attackAlt = UTILS.MetersToFeet(attackAlt)
+    local attackVel=_unit:GetVelocityKNOTS()
+
     -- Tracking info and init of last bomb position.
-    self:T( self.id .. string.format( "RANGE %s: Tracking %s - %s.", self.rangename, _weapon, EventData.weapon:getName() ) )
+    self:T( self.lid .. string.format( "RANGE %s: Tracking %s - %s.", self.rangename, weapon:GetTypeName(), weapon:GetName()))
 
-    -- Init bomb position.
-    local _lastBombPos = { x = 0, y = 0, z = 0 } -- DCS#Vec3
+    -- Set callback function on impact.
+    weapon:SetFuncImpact(RANGE._OnImpact, self, playerData, attackHdg, attackAlt, attackVel)
 
-    -- Function monitoring the position of a bomb until impact.
-    local function trackBomb( _ordnance )
+    -- Weapon is not yet "alife" just yet. Start timer in 0.1 seconds.
+    self:T( self.lid .. string.format( "Range %s, player %s: Tracking of weapon starts in 0.1 seconds.", self.rangename, _playername ) )
+    weapon:StartTrack(0.1)
 
-      -- When the pcall returns a failure the weapon has hit.
-      local _status, _bombPos = pcall( function()
-        return _ordnance:getPoint()
-      end )
-
-      self:T2( self.id .. string.format( "Range %s: Bomb still in air: %s", self.rangename, tostring( _status ) ) )
-      if _status then
-
-        ----------------------------
-        -- Weapon is still in air --
-        ----------------------------
-
-        -- Remember this position.
-        _lastBombPos = { x = _bombPos.x, y = _bombPos.y, z = _bombPos.z }
-
-        -- Check again in ~0.005 seconds ==> 200 checks per second.
-        return timer.getTime() + self.dtBombtrack
-
-      else
-
-        -----------------------------
-        -- Bomb did hit the ground --
-        -----------------------------
-
-        -- Get closet target to last position.
-        local _closetTarget = nil -- #RANGE.BombTarget
-        local _distance = nil
-        local _closeCoord = nil
-        local _hitquality = "POOR"
-
-        -- Get callsign.
-        local _callsign = self:_myname( _unitName )
-
-        -- Coordinate of impact point.
-        local impactcoord = COORDINATE:NewFromVec3( _lastBombPos )
-
-        -- Check if impact happened in range zone.
-        local insidezone = self.rangezone:IsCoordinateInZone( impactcoord )
-
-        -- Impact point of bomb.
-        if self.Debug then
-          impactcoord:MarkToAll( "Bomb impact point" )
-        end
-
-        -- Smoke impact point of bomb.
-        if playerData.smokebombimpact and insidezone then
-          if playerData.delaysmoke then
-            timer.scheduleFunction( self._DelayedSmoke, { coord = impactcoord, color = playerData.smokecolor }, timer.getTime() + self.TdelaySmoke )
-          else
-            impactcoord:Smoke( playerData.smokecolor )
-          end
-        end
-
-        -- Loop over defined bombing targets.
-        for _, _bombtarget in pairs( self.bombingTargets ) do
-
-          -- Get target coordinate.
-          local targetcoord = self:_GetBombTargetCoordinate( _bombtarget )
-
-          if targetcoord then
-
-            -- Distance between bomb and target.
-            local _temp = impactcoord:Get2DDistance( targetcoord )
-
-            -- Find closest target to last known position of the bomb.
-            if _distance == nil or _temp < _distance then
-              _distance = _temp
-              _closetTarget = _bombtarget
-              _closeCoord = targetcoord
-              if _distance <= 1.53 then -- Rangeboss Edit
-                _hitquality = "SHACK" -- Rangeboss Edit
-              elseif _distance <= 0.5 * _bombtarget.goodhitrange then -- Rangeboss Edit
-                _hitquality = "EXCELLENT"
-              elseif _distance <= _bombtarget.goodhitrange then
-                _hitquality = "GOOD"
-              elseif _distance <= 2 * _bombtarget.goodhitrange then
-                _hitquality = "INEFFECTIVE"
-              else
-                _hitquality = "POOR"
-              end
-
-            end
-          end
-        end
-
-        -- Count if bomb fell less than ~1 km away from the target.
-        if _distance and _distance <= self.scorebombdistance then
-          -- Init bomb player results.
-          if not self.bombPlayerResults[_playername] then
-            self.bombPlayerResults[_playername] = {}
-          end
-
-          -- Local results.
-          local _results = self.bombPlayerResults[_playername]
-
-          local result = {} -- #RANGE.BombResult
-          result.name = _closetTarget.name or "unknown"
-          result.distance = _distance
-          result.radial = _closeCoord:HeadingTo( impactcoord )
-          result.weapon = _weaponName or "unknown"
-          result.quality = _hitquality
-          result.player = playerData.playername
-          result.time = timer.getAbsTime()
-          result.airframe = playerData.airframe
-          result.roundsFired = 0 -- Rangeboss Edit
-          result.roundsHit = 0 -- Rangeboss Edit
-          result.roundsQuality = "N/A" -- Rangeboss Edit
-          result.rangename = self.rangename
-
-          -- Add to table.
-          table.insert( _results, result )
-
-          -- Call impact.
-          self:Impact( result, playerData )
-
-        elseif insidezone then
-
-          -- Send message.
-          local _message = string.format( "%s, weapon impacted too far from nearest range target (>%.1f km). No score!", _callsign, self.scorebombdistance / 1000 )
-          self:_DisplayMessageToGroup( _unit, _message, nil, false )
-
-          if self.rangecontrol then
-            self.rangecontrol:NewTransmission( RANGE.Sound.RCWeaponImpactedTooFar.filename, RANGE.Sound.RCWeaponImpactedTooFar.duration, self.soundpath, nil, nil, _message, self.subduration )
-          end
-
-        else
-          self:T( self.id .. "Weapon impacted outside range zone." )
-        end
-
-        -- Terminate the timer
-        self:T( self.id .. string.format( "Range %s, player %s: Terminating bomb track timer.", self.rangename, _playername ) )
-        return nil
-
-      end -- _status check
-
-    end -- end function trackBomb
-
-    -- Weapon is not yet "alife" just yet. Start timer in one second.
-    self:T( self.id .. string.format( "Range %s, player %s: Tracking of weapon starts in 0.1 seconds.", self.rangename, _playername ) )
-    timer.scheduleFunction( trackBomb, EventData.weapon, timer.getTime() + 0.1 )
-
-  end -- if _track (string.match) and player-range distance < threshold.
+  end
 
 end
 
@@ -2016,7 +2124,7 @@ function RANGE:onafterStatus( From, Event, To )
     end
 
     -- Check range status.
-    self:I( self.id .. text )
+    self:I( self.lid .. text )
 
   end
 
@@ -2037,17 +2145,34 @@ function RANGE:onafterEnterRange( From, Event, To, player )
 
   if self.instructor and self.rangecontrol then
 
-    -- Range control radio frequency split.
-    local RF = UTILS.Split( string.format( "%.3f", self.rangecontrolfreq ), "." )
+    if self.useSRS then
 
-    -- Radio message that player entered the range
-    self.instructor:NewTransmission( RANGE.Sound.IREnterRange.filename, RANGE.Sound.IREnterRange.duration, self.soundpath )
-    self.instructor:Number2Transmission( RF[1] )
-    if tonumber( RF[2] ) > 0 then
-      self.instructor:NewTransmission( RANGE.Sound.IRDecimal.filename, RANGE.Sound.IRDecimal.duration, self.soundpath )
-      self.instructor:Number2Transmission( RF[2] )
+
+      local text = string.format("You entered the bombing range. For hit assessment, contact the range controller at %.3f MHz", self.rangecontrolfreq)
+      local ttstext = string.format("You entered the bombing range. For hit assessment, contact the range controller at %.3f mega hertz.", self.rangecontrolfreq)
+
+      local group = player.client:GetGroup()
+
+      self.instructsrsQ:NewTransmission(ttstext, nil, self.instructmsrs, nil, 1, {group}, text, 10)
+
+    else
+
+      -- Range control radio frequency split.
+      local RF = UTILS.Split( string.format( "%.3f", self.rangecontrolfreq ), "." )
+
+      -- Radio message that player entered the range
+
+      -- You entered the bombing range. For hit assessment, contact the range controller at xy MHz
+      self.instructor:NewTransmission( RANGE.Sound.IREnterRange.filename, RANGE.Sound.IREnterRange.duration, self.soundpath )
+      self.instructor:Number2Transmission( RF[1] )
+
+      if tonumber( RF[2] ) > 0 then
+        self.instructor:NewTransmission( RANGE.Sound.IRDecimal.filename, RANGE.Sound.IRDecimal.duration, self.soundpath )
+        self.instructor:Number2Transmission( RF[2] )
+      end
+
+      self.instructor:NewTransmission( RANGE.Sound.IRMegaHertz.filename, RANGE.Sound.IRMegaHertz.duration, self.soundpath )
     end
-    self.instructor:NewTransmission( RANGE.Sound.IRMegaHertz.filename, RANGE.Sound.IRMegaHertz.duration, self.soundpath )
   end
 
 end
@@ -2061,7 +2186,29 @@ end
 function RANGE:onafterExitRange( From, Event, To, player )
 
   if self.instructor then
-    self.instructor:NewTransmission( RANGE.Sound.IRExitRange.filename, RANGE.Sound.IRExitRange.duration, self.soundpath )
+    -- You left the bombing range zone. Have a nice day!
+    if self.useSRS then
+
+      local text = "You left the bombing range zone. "
+
+      local r=math.random(5)
+
+      if r==1 then
+        text=text.."Have a nice day!"
+      elseif r==2 then
+        text=text.."Take care and bye bye!"
+      elseif r==3 then
+        text=text.."Talk to you soon!"
+      elseif r==4 then
+        text=text.."See you in two weeks!"
+      elseif r==5 then
+        text=text.."!"
+      end
+
+      self.instructsrsQ:NewTransmission(text, nil, self.instructmsrs, nil, 1, {player.client:GetGroup()}, text, 10)
+    else
+      self.instructor:NewTransmission( RANGE.Sound.IRExitRange.filename, RANGE.Sound.IRExitRange.duration, self.soundpath )
+    end
   end
 
 end
@@ -2078,47 +2225,76 @@ function RANGE:onafterImpact( From, Event, To, result, player )
   -- Only display target name if there is more than one bomb target.
   local targetname = nil
   if #self.bombingTargets > 1 then
-    local targetname = result.name
+    targetname = result.name
   end
 
   -- Send message to player.
-  local text = string.format( "%s, impact %03d° for %d ft", player.playername, result.radial, UTILS.MetersToFeet( result.distance ) )
+  local text = string.format( "%s, impact %03d° for %d ft (%d m)", player.playername, result.radial, UTILS.MetersToFeet( result.distance ), result.distance )
   if targetname then
-    text = text .. string.format( " from bulls of target %s." )
+    text = text .. string.format( " from bulls of target %s.", targetname )
   else
     text = text .. "."
   end
   text = text .. string.format( " %s hit.", result.quality )
 
   if self.rangecontrol then
-    self.rangecontrol:NewTransmission( RANGE.Sound.RCImpact.filename, RANGE.Sound.RCImpact.duration, self.soundpath, nil, nil, text, self.subduration )
-    self.rangecontrol:Number2Transmission( string.format( "%03d", result.radial ), nil, 0.1 )
-    self.rangecontrol:NewTransmission( RANGE.Sound.RCDegrees.filename, RANGE.Sound.RCDegrees.duration, self.soundpath )
-    self.rangecontrol:NewTransmission( RANGE.Sound.RCFor.filename, RANGE.Sound.RCFor.duration, self.soundpath )
-    self.rangecontrol:Number2Transmission( string.format( "%d", UTILS.MetersToFeet( result.distance ) ) )
-    self.rangecontrol:NewTransmission( RANGE.Sound.RCFeet.filename, RANGE.Sound.RCFeet.duration, self.soundpath )
-    if result.quality == "POOR" then
-      self.rangecontrol:NewTransmission( RANGE.Sound.RCPoorHit.filename, RANGE.Sound.RCPoorHit.duration, self.soundpath, nil, 0.5 )
-    elseif result.quality == "INEFFECTIVE" then
-      self.rangecontrol:NewTransmission( RANGE.Sound.RCIneffectiveHit.filename, RANGE.Sound.RCIneffectiveHit.duration, self.soundpath, nil, 0.5 )
-    elseif result.quality == "GOOD" then
-      self.rangecontrol:NewTransmission( RANGE.Sound.RCGoodHit.filename, RANGE.Sound.RCGoodHit.duration, self.soundpath, nil, 0.5 )
-    elseif result.quality == "EXCELLENT" then
-      self.rangecontrol:NewTransmission( RANGE.Sound.RCExcellentHit.filename, RANGE.Sound.RCExcellentHit.duration, self.soundpath, nil, 0.5 )
-    end
 
+    if self.useSRS then
+      local group = player.client:GetGroup()
+      self.controlsrsQ:NewTransmission(text,nil,self.controlmsrs,nil,1,{group},text,10)
+    else
+      self.rangecontrol:NewTransmission( RANGE.Sound.RCImpact.filename, RANGE.Sound.RCImpact.duration, self.soundpath, nil, nil, text, self.subduration )
+      self.rangecontrol:Number2Transmission( string.format( "%03d", result.radial ), nil, 0.1 )
+      self.rangecontrol:NewTransmission( RANGE.Sound.RCDegrees.filename, RANGE.Sound.RCDegrees.duration, self.soundpath )
+      self.rangecontrol:NewTransmission( RANGE.Sound.RCFor.filename, RANGE.Sound.RCFor.duration, self.soundpath )
+      self.rangecontrol:Number2Transmission( string.format( "%d", UTILS.MetersToFeet( result.distance ) ) )
+      self.rangecontrol:NewTransmission( RANGE.Sound.RCFeet.filename, RANGE.Sound.RCFeet.duration, self.soundpath )
+      if result.quality == "POOR" then
+        self.rangecontrol:NewTransmission( RANGE.Sound.RCPoorHit.filename, RANGE.Sound.RCPoorHit.duration, self.soundpath, nil, 0.5 )
+      elseif result.quality == "INEFFECTIVE" then
+        self.rangecontrol:NewTransmission( RANGE.Sound.RCIneffectiveHit.filename, RANGE.Sound.RCIneffectiveHit.duration, self.soundpath, nil, 0.5 )
+      elseif result.quality == "GOOD" then
+        self.rangecontrol:NewTransmission( RANGE.Sound.RCGoodHit.filename, RANGE.Sound.RCGoodHit.duration, self.soundpath, nil, 0.5 )
+      elseif result.quality == "EXCELLENT" then
+        self.rangecontrol:NewTransmission( RANGE.Sound.RCExcellentHit.filename, RANGE.Sound.RCExcellentHit.duration, self.soundpath, nil, 0.5 )
+      end
+    end
   end
 
   -- Unit.
-  local unit = UNIT:FindByName( player.unitname )
+  if player.unitname and not self.useSRS then
 
-  -- Send message.
-  self:_DisplayMessageToGroup( unit, text, nil, true )
-  self:T( self.id .. text )
+    -- Get unit.
+    local unit = UNIT:FindByName( player.unitname )
+
+    -- Send message.
+      self:_DisplayMessageToGroup( unit, text, nil, true )
+    self:T( self.lid .. text )
+  end
 
   -- Save results.
   if self.autosave then
     self:Save()
+  end
+
+  -- Send result to FunkMan, which creates fancy MatLab figures and sends them to Discord via a bot.
+  if self.funkmanSocket then
+    self.funkmanSocket:SendTable(result)
+  end
+
+end
+
+--- Function called after strafing run.
+-- @param #RANGE self
+-- @param #string From From state.
+-- @param #string Event Event.
+-- @param #string To To state.
+-- @param #RANGE.PlayerData player Player data table.
+-- @param #RANGE.StrafeResult result Result of run.
+function RANGE:onafterStrafeResult( From, Event, To, player, result)
+
+  if self.funkmanSocket then
+    self.funkmanSocket:SendTable(result)
   end
 
 end
@@ -2132,7 +2308,7 @@ function RANGE:onbeforeSave( From, Event, To )
   if io and lfs then
     return true
   else
-    self:E( self.id .. string.format( "WARNING: io and/or lfs not desanitized. Cannot save player results." ) )
+    self:E( self.lid .. string.format( "WARNING: io and/or lfs not desanitized. Cannot save player results." ) )
     return false
   end
 end
@@ -2149,9 +2325,9 @@ function RANGE:onafterSave( From, Event, To )
     if f then
       f:write( data )
       f:close()
-      self:I( self.id .. string.format( "Saving player results to file %s", tostring( filename ) ) )
+      self:I( self.lid .. string.format( "Saving player results to file %s", tostring( filename ) ) )
     else
-      self:E( self.id .. string.format( "ERROR: Could not save results to file %s", tostring( filename ) ) )
+      self:E( self.lid .. string.format( "ERROR: Could not save results to file %s", tostring( filename ) ) )
     end
   end
 
@@ -2175,12 +2351,9 @@ function RANGE:onafterSave( From, Event, To )
       local target = result.name
       local radial = result.radial
       local quality = result.quality
-      local time = UTILS.SecondsToClock( result.time )
+      local time = UTILS.SecondsToClock(result.time, true)
       local airframe = result.airframe
-      local date = "n/a"
-      if os then
-        date = os.date()
-      end
+      local date = result.date or "n/a"
       scores = scores .. string.format( "\n%s,%d,%s,%.2f,%03d,%s,%s,%s,%s,%s", playername, i, target, distance, radial, quality, weapon, airframe, time, date )
     end
   end
@@ -2197,7 +2370,7 @@ function RANGE:onbeforeLoad( From, Event, To )
   if io and lfs then
     return true
   else
-    self:E( self.id .. string.format( "WARNING: io and/or lfs not desanitized. Cannot load player results." ) )
+    self:E( self.lid .. string.format( "WARNING: io and/or lfs not desanitized. Cannot load player results." ) )
     return false
   end
 end
@@ -2213,12 +2386,12 @@ function RANGE:onafterLoad( From, Event, To )
   local function _loadfile( filename )
     local f = io.open( filename, "rb" )
     if f then
-      -- self:I(self.id..string.format("Loading player results from file %s", tostring(filename)))
+      -- self:I(self.lid..string.format("Loading player results from file %s", tostring(filename)))
       local data = f:read( "*all" )
       f:close()
       return data
     else
-      self:E( self.id .. string.format( "WARNING: Could not load player results from file %s. File might not exist just yet.", tostring( filename ) ) )
+      self:E( self.lid .. string.format( "WARNING: Could not load player results from file %s. File might not exist just yet.", tostring( filename ) ) )
       return nil
     end
   end
@@ -2231,7 +2404,7 @@ function RANGE:onafterLoad( From, Event, To )
 
   -- Info message.
   local text = string.format( "Loading player bomb results from file %s", filename )
-  self:I( self.id .. text )
+  self:I( self.lid .. text )
 
   -- Load asset data from file.
   local data = _loadfile( filename )
@@ -2353,7 +2526,8 @@ end
 --- Start smoking a coordinate with a delay.
 -- @param #table _args Argements passed.
 function RANGE._DelayedSmoke( _args )
-  trigger.action.smoke( _args.coord:GetVec3(), _args.color )
+  _args.coord:Smoke(_args.color)
+  --trigger.action.smoke( _args.coord:GetVec3(), _args.color )
 end
 
 --- Display top 10 stafing results of a specific player.
@@ -2363,7 +2537,7 @@ function RANGE:_DisplayMyStrafePitResults( _unitName )
   self:F( _unitName )
 
   -- Get player unit and name
-  local _unit, _playername = self:_GetPlayerUnitAndName( _unitName )
+  local _unit, _playername, _multiplayer = self:_GetPlayerUnitAndName( _unitName )
 
   if _unit and _playername then
 
@@ -2371,7 +2545,7 @@ function RANGE:_DisplayMyStrafePitResults( _unitName )
     local _message = string.format( "My Top %d Strafe Pit Results:\n", self.ndisplayresult )
 
     -- Get player results.
-    local _results = self.strafePlayerResults[_playername] 
+    local _results = self.strafePlayerResults[_playername]
 
     -- Create message.
     if _results == nil then
@@ -2381,7 +2555,7 @@ function RANGE:_DisplayMyStrafePitResults( _unitName )
 
       -- Sort results table wrt number of hits.
       local _sort = function( a, b )
-        return a.hits > b.hits
+        return a.roundsHit > b.roundsHit
       end
       table.sort( _results, _sort )
 
@@ -2398,7 +2572,7 @@ function RANGE:_DisplayMyStrafePitResults( _unitName )
 
         -- Best result.
         if _bestMsg == "" then
-          _bestMsg = string.format( "Hits %d - %s - %s", _result.hits, _result.zone.name, _result.text )
+          _bestMsg = string.format( "Hits %d - %s - %s", result.roundsHit, result.name, result.roundsQuality)
         end
 
         -- 10 runs
@@ -2415,7 +2589,7 @@ function RANGE:_DisplayMyStrafePitResults( _unitName )
     end
 
     -- Send message to group.
-    self:_DisplayMessageToGroup( _unit, _message, nil, true, true )
+    self:_DisplayMessageToGroup( _unit, _message, nil, true, true, _multiplayer )
   end
 end
 
@@ -2426,7 +2600,7 @@ function RANGE:_DisplayStrafePitResults( _unitName )
   self:F( _unitName )
 
   -- Get player unit and name.
-  local _unit, _playername = self:_GetPlayerUnitAndName( _unitName )
+  local _unit, _playername, _multiplayer = self:_GetPlayerUnitAndName( _unitName )
 
   -- Check if we have a unit which is a player.
   if _unit and _playername then
@@ -2443,15 +2617,15 @@ function RANGE:_DisplayStrafePitResults( _unitName )
       -- Get the best result of the player.
       local _best = nil
       for _, _result in pairs( _results ) do
-        if _best == nil or _result.hits > _best.hits then
+        if _best == nil or _result.roundsHit > _best.roundsHit then
           _best = _result
         end
       end
 
       -- Add best result to table.
       if _best ~= nil then
-        local text = string.format( "%s: Hits %i - %s - %s", _playerName, _best.hits, _best.zone.name, _best.text )
-        table.insert( _playerResults, { msg = text, hits = _best.hits } )
+        local text = string.format( "%s: Hits %i - %s - %s", _playerName, _best.roundsHit, _best.name, _best.roundsQuality )
+        table.insert( _playerResults, { msg = text, hits = _best.roundsHit } )
       end
 
     end
@@ -2473,7 +2647,7 @@ function RANGE:_DisplayStrafePitResults( _unitName )
     end
 
     -- Send message.
-    self:_DisplayMessageToGroup( _unit, _message, nil, true, true )
+    self:_DisplayMessageToGroup( _unit, _message, nil, true, true, _multiplayer )
   end
 end
 
@@ -2484,7 +2658,7 @@ function RANGE:_DisplayMyBombingResults( _unitName )
   self:F( _unitName )
 
   -- Get player unit and name.
-  local _unit, _playername = self:_GetPlayerUnitAndName( _unitName )
+  local _unit, _playername, _multiplayer = self:_GetPlayerUnitAndName( _unitName )
 
   if _unit and _playername then
 
@@ -2530,7 +2704,7 @@ function RANGE:_DisplayMyBombingResults( _unitName )
     end
 
     -- Send message.
-    self:_DisplayMessageToGroup( _unit, _message, nil, true, true )
+    self:_DisplayMessageToGroup( _unit, _message, nil, true, true, _multiplayer )
   end
 end
 
@@ -2544,7 +2718,7 @@ function RANGE:_DisplayBombingResults( _unitName )
   local _playerResults = {}
 
   -- Get player unit and name.
-  local _unit, _player = self:_GetPlayerUnitAndName( _unitName )
+  local _unit, _player, _multiplayer = self:_GetPlayerUnitAndName( _unitName )
 
   -- Check if we have a unit with a player.
   if _unit and _player then
@@ -2588,7 +2762,7 @@ function RANGE:_DisplayBombingResults( _unitName )
     end
 
     -- Send message.
-    self:_DisplayMessageToGroup( _unit, _message, nil, true, true )
+    self:_DisplayMessageToGroup( _unit, _message, nil, true, true, _multiplayer )
   end
 end
 
@@ -2599,11 +2773,11 @@ function RANGE:_DisplayRangeInfo( _unitname )
   self:F( _unitname )
 
   -- Get player unit and player name.
-  local unit, playername = self:_GetPlayerUnitAndName( _unitname )
+  local unit, playername, _multiplayer = self:_GetPlayerUnitAndName( _unitname )
 
   -- Check if we have a player.
   if unit and playername then
-
+    self:I(playername)
     -- Message text.
     local text = ""
 
@@ -2667,15 +2841,37 @@ function RANGE:_DisplayRangeInfo( _unitname )
       text = text .. string.format( "Max strafing alt AGL: %s\n", tstrafemaxalt )
       text = text .. string.format( "# of strafe targets: %d\n", self.nstrafetargets )
       text = text .. string.format( "# of bomb targets: %d\n", self.nbombtargets )
+      if self.instructor then
+        local alive = "N/A"
+        if self.instructorrelayname then
+          local relay = UNIT:FindByName( self.instructorrelayname )
+          if relay then
+            --alive = tostring( relay:IsAlive() )
+            alive = relay:IsAlive() and "ok" or "N/A"
+          end
+        end
+        text = text .. string.format( "Instructor %.3f MHz (Relay=%s)\n", self.instructorfreq, alive )
+      end
+      if self.rangecontrol then
+        local alive = "N/A"
+        if self.rangecontrolrelayname then
+          local relay = UNIT:FindByName( self.rangecontrolrelayname )
+          if relay then
+            alive = tostring( relay:IsAlive() )
+            alive = relay:IsAlive() and "ok" or "N/A"
+          end
+        end
+        text = text .. string.format( "Control %.3f MHz (Relay=%s)\n", self.rangecontrolfreq, alive )
+      end
       text = text .. texthit
       text = text .. textbomb
       text = text .. textdelay
 
       -- Send message to player group.
-      self:_DisplayMessageToGroup( unit, text, nil, true, true )
+      self:_DisplayMessageToGroup( unit, text, nil, true, true, _multiplayer )
 
       -- Debug output.
-      self:T2( self.id .. text )
+      self:T2( self.lid .. text )
     end
   end
 end
@@ -2687,7 +2883,7 @@ function RANGE:_DisplayBombTargets( _unitname )
   self:F( _unitname )
 
   -- Get player unit and player name.
-  local _unit, _playername = self:_GetPlayerUnitAndName( _unitname )
+  local _unit, _playername, _multiplayer = self:_GetPlayerUnitAndName( _unitname )
 
   -- Check if we have a player.
   if _unit and _playername then
@@ -2719,7 +2915,7 @@ function RANGE:_DisplayBombTargets( _unitname )
       end
     end
 
-    self:_DisplayMessageToGroup( _unit, _text, 120, true, true )
+    self:_DisplayMessageToGroup( _unit, _text, 120, true, true, _multiplayer )
   end
 end
 
@@ -2730,7 +2926,7 @@ function RANGE:_DisplayStrafePits( _unitname )
   self:F( _unitname )
 
   -- Get player unit and player name.
-  local _unit, _playername = self:_GetPlayerUnitAndName( _unitname )
+  local _unit, _playername, _multiplayer = self:_GetPlayerUnitAndName( _unitname )
 
   -- Check if we have a player.
   if _unit and _playername then
@@ -2759,7 +2955,7 @@ function RANGE:_DisplayStrafePits( _unitname )
       _text = _text .. string.format( "\n- %s: heading %03d°\n%s", _strafepit.name, heading, mycoord )
     end
 
-    self:_DisplayMessageToGroup( _unit, _text, nil, true, true )
+    self:_DisplayMessageToGroup( _unit, _text, nil, true, true, _multiplayer )
   end
 end
 
@@ -2770,7 +2966,7 @@ function RANGE:_DisplayRangeWeather( _unitname )
   self:F( _unitname )
 
   -- Get player unit and player name.
-  local unit, playername = self:_GetPlayerUnitAndName( _unitname )
+  local unit, playername, _multiplayer = self:_GetPlayerUnitAndName( _unitname )
 
   -- Check if we have a player.
   if unit and playername then
@@ -2819,12 +3015,12 @@ function RANGE:_DisplayRangeWeather( _unitname )
     end
 
     -- Send message to player group.
-    self:_DisplayMessageToGroup( unit, text, nil, true, true )
+    self:_DisplayMessageToGroup( unit, text, nil, true, true, _multiplayer )
 
     -- Debug output.
-    self:T2( self.id .. text )
+    self:T2( self.lid .. text )
   else
-    self:T( self.id .. string.format( "ERROR! Could not find player unit in RangeInfo! Name = %s", _unitname ) )
+    self:T( self.lid .. string.format( "ERROR! Could not find player unit in RangeInfo! Name = %s", _unitname ) )
   end
 end
 
@@ -2883,10 +3079,10 @@ function RANGE:_CheckInZone( _unitName )
   local unitheading = 0 -- RangeBoss
 
   if _unit and _playername then
-  
+
     -- Player data.
     local playerData=self.PlayerSettings[_playername] -- #RANGE.PlayerData
-    
+
     --- Function to check if unit is in zone and facing in the right direction and is below the max alt.
     local function checkme( targetheading, _zone )
       local zone = _zone -- Core.Zone#ZONE
@@ -2900,7 +3096,7 @@ function RANGE:_CheckInZone( _unitName )
       if towardspit then
 
         local vec3 = _unit:GetVec3()
-        local vec2 = { x = vec3.x, y = vec3.z } -- DCS#Vec2        
+        local vec2 = { x = vec3.x, y = vec3.z } -- DCS#Vec2
         local landheight = land.getHeight( vec2 )
         local unitalt = vec3.y - landheight
 
@@ -2949,9 +3145,16 @@ function RANGE:_CheckInZone( _unitName )
           self:_DisplayMessageToGroup( _unit, _msg, nil, true )
 
           if self.rangecontrol then
-            self.rangecontrol:NewTransmission( RANGE.Sound.RCLeftStrafePitTooQuickly.filename, RANGE.Sound.RCLeftStrafePitTooQuickly.duration, self.soundpath )
+            if self.useSRS then
+              local group = _unit:GetGroup()
+              local text = "You left the strafing zone too quickly! No score!"
+              --self.controlsrsQ:NewTransmission(text,nil,self.controlmsrs,nil,1,{group},text,10)
+              self.controlsrsQ:NewTransmission(text,nil,self.controlmsrs,nil,1)
+            else
+              -- You left the strafing zone too quickly! No score!
+              self.rangecontrol:NewTransmission( RANGE.Sound.RCLeftStrafePitTooQuickly.filename, RANGE.Sound.RCLeftStrafePitTooQuickly.duration, self.soundpath )
+            end
           end
-
         else
 
           -- Get current ammo.
@@ -2959,26 +3162,9 @@ function RANGE:_CheckInZone( _unitName )
 
           -- Result.
           local _result = self.strafeStatus[_unitID] --#RANGE.StrafeStatus
-          
+
           local _sound = nil -- #RANGE.Soundfile
-          
-          --[[ --RangeBoss commented out in order to implement strafe quality based on accuracy percentage, not the number of rounds on target
-          -- Judge this pass. Text is displayed on summary.
-          if _result.hits >= _result.zone.goodPass*2 then
-            _result.text = "EXCELLENT PASS"
-            _sound=RANGE.Sound.RCExcellentPass
-          elseif _result.hits >= _result.zone.goodPass then
-            _result.text = "GOOD PASS"
-            _sound=RANGE.Sound.RCGoodPass
-          elseif _result.hits >= _result.zone.goodPass/2 then
-            _result.text = "INEFFECTIVE PASS"
-            _sound=RANGE.Sound.RCIneffectivePass
-          else
-            _result.text = "POOR PASS"
-            _sound=RANGE.Sound.RCPoorPass
-          end
-          ]]
-          
+
           -- Calculate accuracy of run. Number of hits wrt number of rounds fired.
           local shots = _result.ammo - _ammo
           local accur = 0
@@ -2988,7 +3174,7 @@ function RANGE:_CheckInZone( _unitName )
               accur = 100
             end
           end
-          
+
           -- Results text and sound message.
           local resulttext=""
           if _result.pastfoulline == true then --
@@ -3015,19 +3201,26 @@ function RANGE:_CheckInZone( _unitName )
 
           -- Message text.
           local _text = string.format( "%s, hits on target %s: %d", self:_myname( _unitName ), _result.zone.name, _result.hits )
+          local ttstext = string.format( "%s, hits on target %s: %d.", self:_myname( _unitName ), _result.zone.name, _result.hits )
           if shots and accur then
             _text = _text .. string.format( "\nTotal rounds fired %d. Accuracy %.1f %%.", shots, accur )
+            ttstext = ttstext .. string.format( ". Total rounds fired %d. Accuracy %.1f percent.", shots, accur )
           end
-          _text = _text .. string.format( "\n%s", _result.text )
+          _text = _text .. string.format( "\n%s", resulttext )
+          ttstext = ttstext .. string.format( " %s", resulttext )
 
           -- Send message.
           self:_DisplayMessageToGroup( _unit, _text )
-          
+
           -- Strafe result.
           local result = {} -- #RANGE.StrafeResult
+          result.command=SOCKET.DataType.STRAFERESULT
           result.player=_playername
           result.name=_result.zone.name or "unknown"
           result.time = timer.getAbsTime()
+          result.clock = UTILS.SecondsToClock(result.time)
+          result.midate = UTILS.GetDCSMissionDate()
+          result.theatre = env.mission.theatre
           result.roundsFired = shots
           result.roundsHit = _result.hits
           result.roundsQuality = resulttext
@@ -3035,27 +3228,31 @@ function RANGE:_CheckInZone( _unitName )
           result.rangename = self.rangename
           result.airframe=playerData.airframe
           result.invalid = _result.pastfoulline
-          
+
           -- Griger Results.
           self:StrafeResult(playerData, result)
- 
+
           -- Save trap sheet.
           if playerData and playerData.targeton and self.targetsheet then
             self:_SaveTargetSheet( _playername, result )
-          end        
+          end
 
           -- Voice over.
           if self.rangecontrol then
-            self.rangecontrol:NewTransmission( RANGE.Sound.RCHitsOnTarget.filename, RANGE.Sound.RCHitsOnTarget.duration, self.soundpath )
-            self.rangecontrol:Number2Transmission( string.format( "%d", _result.hits ) )
-            if shots and accur then
-              self.rangecontrol:NewTransmission( RANGE.Sound.RCTotalRoundsFired.filename, RANGE.Sound.RCTotalRoundsFired.duration, self.soundpath, nil, 0.2 )
-              self.rangecontrol:Number2Transmission( string.format( "%d", shots ), nil, 0.2 )
-              self.rangecontrol:NewTransmission( RANGE.Sound.RCAccuracy.filename, RANGE.Sound.RCAccuracy.duration, self.soundpath, nil, 0.2 )
-              self.rangecontrol:Number2Transmission( string.format( "%d", UTILS.Round( accur, 0 ) ) )
-              self.rangecontrol:NewTransmission( RANGE.Sound.RCPercent.filename, RANGE.Sound.RCPercent.duration, self.soundpath )
+            if self.useSRS then
+              self.controlsrsQ:NewTransmission(ttstext,nil,self.controlmsrs,nil,1)
+            else
+              self.rangecontrol:NewTransmission( RANGE.Sound.RCHitsOnTarget.filename, RANGE.Sound.RCHitsOnTarget.duration, self.soundpath )
+              self.rangecontrol:Number2Transmission( string.format( "%d", _result.hits ) )
+              if shots and accur then
+                self.rangecontrol:NewTransmission( RANGE.Sound.RCTotalRoundsFired.filename, RANGE.Sound.RCTotalRoundsFired.duration, self.soundpath, nil, 0.2 )
+                self.rangecontrol:Number2Transmission( string.format( "%d", shots ), nil, 0.2 )
+                self.rangecontrol:NewTransmission( RANGE.Sound.RCAccuracy.filename, RANGE.Sound.RCAccuracy.duration, self.soundpath, nil, 0.2 )
+                self.rangecontrol:Number2Transmission( string.format( "%d", UTILS.Round( accur, 0 ) ) )
+                self.rangecontrol:NewTransmission( RANGE.Sound.RCPercent.filename, RANGE.Sound.RCPercent.duration, self.soundpath )
+              end
+              self.rangecontrol:NewTransmission( _sound.filename, _sound.duration, self.soundpath, nil, 0.5 )
             end
-            self.rangecontrol:NewTransmission( _sound.filename, _sound.duration, self.soundpath, nil, 0.5 )
           end
 
           -- Set strafe status to nil.
@@ -3094,12 +3291,16 @@ function RANGE:_CheckInZone( _unitName )
           local _msg = string.format( "%s, rolling in on strafe pit %s.", self:_myname( _unitName ), target.name )
 
           if self.rangecontrol then
-            self.rangecontrol:NewTransmission( RANGE.Sound.RCRollingInOnStrafeTarget.filename, RANGE.Sound.RCRollingInOnStrafeTarget.duration, self.soundpath )
+            if self.useSRS then
+              self.controlsrsQ:NewTransmission(_msg,nil,self.controlmsrs,nil,1)
+            else
+              self.rangecontrol:NewTransmission( RANGE.Sound.RCRollingInOnStrafeTarget.filename, RANGE.Sound.RCRollingInOnStrafeTarget.duration, self.soundpath )
+            end
           end
 
           -- Send message.
           self:_DisplayMessageToGroup( _unit, _msg, 10, true )
-          
+
           -- Trigger event that player is rolling in.
           self:RollingIn(playerData, target)
 
@@ -3214,10 +3415,10 @@ function RANGE:_AddF10Commands( _unitName )
         local _StrPits = MENU_GROUP_COMMAND:New( group, "Strafe Pits", _infoPath, self._DisplayStrafePits, self, _unitName ):Refresh()
       end
     else
-      self:E( self.id .. "Could not find group or group ID in AddF10Menu() function. Unit name: " .. _unitName )
+      self:E( self.lid .. "Could not find group or group ID in AddF10Menu() function. Unit name: " .. _unitName or "N/A")
     end
   else
-    self:E( self.id .. "Player unit does not exist in AddF10Menu() function. Unit name: " .. _unitName )
+    self:E( self.lid .. "Player unit does not exist in AddF10Menu() function. Unit name: " .. _unitName or "N/A")
   end
 
 end
@@ -3236,14 +3437,15 @@ function RANGE:_GetBombTargetCoordinate( target )
 
   if target.type == RANGE.TargetType.UNIT then
 
-    if not target.move then
-      -- Target should not move.
-      coord = target.coordinate
+    -- Check if alive
+    if target.target and target.target:IsAlive() then
+      -- Get current position.
+      coord = target.target:GetCoordinate()
+      -- Save as last known position in case target dies.
+      target.coordinate=coord
     else
-      -- Moving target. Check if alive and get current position
-      if target.target and target.target:IsAlive() then
-        coord = target.target:GetCoordinate()
-      end
+      -- Use stored position.
+      coord = target.coordinate
     end
 
   elseif target.type == RANGE.TargetType.STATIC then
@@ -3256,8 +3458,13 @@ function RANGE:_GetBombTargetCoordinate( target )
     -- Coordinates dont move.
     coord = target.coordinate
 
+  elseif target.type == RANGE.TargetType.SCENERY then
+
+    -- Coordinates dont move.
+    coord = target.coordinate
+
   else
-    self:E( self.id .. "ERROR: Unknown target type." )
+    self:E( self.lid .. "ERROR: Unknown target type." )
   end
 
   return coord
@@ -3285,7 +3492,7 @@ function RANGE:_GetAmmo( unitname )
     if ammotable ~= nil then
 
       local weapons = #ammotable
-      self:T2( self.id .. string.format( "Number of weapons %d.", weapons ) )
+      self:T2( self.lid .. string.format( "Number of weapons %d.", weapons ) )
 
       for w = 1, weapons do
 
@@ -3299,10 +3506,10 @@ function RANGE:_GetAmmo( unitname )
           ammo = ammo + Nammo
 
           local text = string.format( "Player %s has %d rounds ammo of type %s", playername, Nammo, Tammo )
-          self:T( self.id .. text )
+          self:T( self.lid .. text )
         else
           local text = string.format( "Player %s has %d ammo of type %s", playername, Nammo, Tammo )
-          self:T( self.id .. text )
+          self:T( self.lid .. text )
         end
       end
     end
@@ -3432,7 +3639,8 @@ end
 -- @param #number _time Duration how long the message is displayed.
 -- @param #boolean _clear Clear up old messages.
 -- @param #boolean display If true, display message regardless of player setting "Messages Off".
-function RANGE:_DisplayMessageToGroup( _unit, _text, _time, _clear, display )
+-- @param #boolean _togroup If true, display the message to the group in any case
+function RANGE:_DisplayMessageToGroup( _unit, _text, _time, _clear, display, _togroup )
   self:F( { unit = _unit, text = _text, time = _time, clear = _clear } )
 
   -- Defaults
@@ -3453,21 +3661,27 @@ function RANGE:_DisplayMessageToGroup( _unit, _text, _time, _clear, display )
 
     -- Group ID.
     local _gid = _unit:GetGroup():GetID()
+    local _grp = _unit:GetGroup()
 
     -- Get playername and player settings
     local _, playername = self:_GetPlayerUnitAndName( _unit:GetName() )
     local playermessage = self.PlayerSettings[playername].messages
 
     -- Send message to player if messages enabled and not only for the examiner.
+
     if _gid and (playermessage == true or display) and (not self.examinerexclusive) then
-      trigger.action.outTextForGroup( _gid, _text, _time, _clear )
+      if _togroup and _grp then
+        local m = MESSAGE:New(_text,_time,nil,_clear):ToGroup(_grp)
+      else
+        local m = MESSAGE:New(_text,_time,nil,_clear):ToUnit(_unit)
+      end
     end
 
     -- Send message to examiner.
     if self.examinergroupname ~= nil then
-      local _examinerid = GROUP:FindByName( self.examinergroupname ):GetID()
+      local _examinerid = GROUP:FindByName( self.examinergroupname )
       if _examinerid then
-        trigger.action.outTextForGroup( _examinerid, _text, _time, _clear )
+        local m = MESSAGE:New(_text,_time,nil,_clear):ToGroup(_examinerid)
       end
     end
   end
@@ -3480,14 +3694,14 @@ end
 function RANGE:_SmokeBombImpactOnOff( unitname )
   self:F( unitname )
 
-  local unit, playername = self:_GetPlayerUnitAndName( unitname )
+  local unit, playername, _multiplayer = self:_GetPlayerUnitAndName( unitname )
   if unit and playername then
     local text
     if self.PlayerSettings[playername].smokebombimpact == true then
       self.PlayerSettings[playername].smokebombimpact = false
       text = string.format( "%s, %s, smoking impact points of bombs is now OFF.", self.rangename, playername )
     else
-      self.PlayerSettigs[playername].smokebombimpact = true
+      self.PlayerSettings[playername].smokebombimpact = true
       text = string.format( "%s, %s, smoking impact points of bombs is now ON.", self.rangename, playername )
     end
     self:_DisplayMessageToGroup( unit, text, 5, false, true )
@@ -3501,14 +3715,14 @@ end
 function RANGE:_SmokeBombDelayOnOff( unitname )
   self:F( unitname )
 
-  local unit, playername = self:_GetPlayerUnitAndName( unitname )
+  local unit, playername, _multiplayer = self:_GetPlayerUnitAndName( unitname )
   if unit and playername then
     local text
     if self.PlayerSettings[playername].delaysmoke == true then
       self.PlayerSettings[playername].delaysmoke = false
       text = string.format( "%s, %s, delayed smoke of bombs is now OFF.", self.rangename, playername )
     else
-      self.PlayerSettigs[playername].delaysmoke = true
+      self.PlayerSettings[playername].delaysmoke = true
       text = string.format( "%s, %s, delayed smoke of bombs is now ON.", self.rangename, playername )
     end
     self:_DisplayMessageToGroup( unit, text, 5, false, true )
@@ -3522,7 +3736,7 @@ end
 function RANGE:_MessagesToPlayerOnOff( unitname )
   self:F( unitname )
 
-  local unit, playername = self:_GetPlayerUnitAndName( unitname )
+  local unit, playername, _multiplayer = self:_GetPlayerUnitAndName( unitname )
   if unit and playername then
     local text
     if self.PlayerSettings[playername].messages == true then
@@ -3543,7 +3757,7 @@ function RANGE:_TargetsheetOnOff( _unitname )
   self:F2( _unitname )
 
   -- Get player unit and player name.
-  local unit, playername = self:_GetPlayerUnitAndName( _unitname )
+  local unit, playername, _multiplayer = self:_GetPlayerUnitAndName( _unitname )
 
   -- Check if we have a player.
   if unit and playername then
@@ -3585,7 +3799,7 @@ end
 function RANGE:_FlareDirectHitsOnOff( unitname )
   self:F( unitname )
 
-  local unit, playername = self:_GetPlayerUnitAndName( unitname )
+  local unit, playername, _multiplayer = self:_GetPlayerUnitAndName( unitname )
   if unit and playername then
     local text
     if self.PlayerSettings[playername].flaredirecthits == true then
@@ -3759,20 +3973,20 @@ function RANGE:_CheckStatic( name )
 
     -- If static is not yet in MOOSE DB, we add it. Can happen for cargo statics!
     if not _MOOSEstatic then
-      self:T( self.id .. string.format( "Adding DCS static to MOOSE database. Name = %s.", name ) )
+      self:T( self.lid .. string.format( "Adding DCS static to MOOSE database. Name = %s.", name ) )
       _DATABASE:AddStatic( name )
     end
 
     return true
   else
-    self:T3( self.id .. string.format( "No static object with name %s exists.", name ) )
+    self:T3( self.lid .. string.format( "No static object with name %s exists.", name ) )
   end
 
   -- Check if a unit has this name.
   if UNIT:FindByName( name ) then
     return false
   else
-    self:T3( self.id .. string.format( "No unit object with name %s exists.", name ) )
+    self:T3( self.lid .. string.format( "No unit object with name %s exists.", name ) )
   end
 
   -- If not unit or static exist, we return nil.
@@ -3804,11 +4018,13 @@ end
 -- @param #string _unitName Name of the player unit.
 -- @return Wrapper.Unit#UNIT Unit of player.
 -- @return #string Name of the player.
--- @return nil If player does not exist.
+-- @return #boolean If true, group has > 1 player in it
 function RANGE:_GetPlayerUnitAndName( _unitName )
   self:F2( _unitName )
 
   if _unitName ~= nil then
+
+    local multiplayer = false
 
     -- Get DCS unit from its name.
     local DCSunit = Unit.getByName( _unitName )
@@ -3820,7 +4036,12 @@ function RANGE:_GetPlayerUnitAndName( _unitName )
 
       self:T2( { DCSunit = DCSunit, unit = unit, playername = playername } )
       if DCSunit and unit and playername then
-        return unit, playername
+        self:F2(playername)
+        local grp = unit:GetGroup()
+        if grp and grp:CountAliveUnits() > 1 then
+          multiplayer = true
+        end
+        return unit, playername, multiplayer
       end
 
     end
@@ -3828,7 +4049,7 @@ function RANGE:_GetPlayerUnitAndName( _unitName )
   end
 
   -- Return nil if we could not find a player.
-  return nil, nil
+  return nil, nil, nil
 end
 
 --- Returns a string which consists of the player name.
@@ -3836,13 +4057,15 @@ end
 -- @param #string unitname Name of the player unit.
 function RANGE:_myname( unitname )
   self:F2( unitname )
-
+  local pname = "Ghost 1 1"
   local unit = UNIT:FindByName( unitname )
-  local pname = unit:GetPlayerName()
-  -- local csign = unit:GetCallsign()
-
-  -- return string.format("%s (%s)", csign, pname)
-  return string.format( "%s", pname )
+  if unit and unit:IsAlive() then
+    local grp = unit:GetGroup()
+    if grp and grp:IsAlive() then
+      pname = grp:GetCustomCallSign(true,true)
+    end
+  end
+  return pname
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
